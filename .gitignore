@@ -1,0 +1,6 @@
+build*/
+test*
+record.txt
+*.out
+*.dat
+.ipynb_checkpoints/

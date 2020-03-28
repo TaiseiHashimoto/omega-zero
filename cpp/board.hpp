@@ -4,13 +4,13 @@
 #include <vector>
 
 
-enum class Side : std::uint8_t
+enum class Side : uint8_t
 {
     BLACK,
     WHITE
 };
 
-enum class PlayerType : std::uint8_t
+enum class PlayerType : uint8_t
 {
     HUMAN,
     COMPUTER
@@ -20,7 +20,7 @@ Side flip_side(Side side);
 
 std::ostream& operator<<(std::ostream& os, Side side);
 
-enum class CellState : std::uint8_t
+enum class CellState : uint8_t
 {
     EMPTY,
     BLACK,

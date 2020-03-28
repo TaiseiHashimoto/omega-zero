@@ -51,11 +51,10 @@ void play_game(int server_sock, std::vector<Node*>& history, std::default_random
 
     for (int move_count = 0;; move_count++) {
         current_node = run_mcts(current_node, server_sock, engine);
-        history.push_back(current_node);
+        history.push_back(current_node);  // terminal node included
         if (current_node->terminal()) {
             return;
         }
-        // printf("\n---\n\n");
     }
 }
 

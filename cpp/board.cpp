@@ -195,12 +195,13 @@ float Board::get_result(Side side) const {
     int count_b = this->count(CellState::BLACK);
     int count_w = this->count(CellState::WHITE);
     // 1 if black win, -1 if white win, 0 if draw
-    float result = (count_b > count_w) - (count_b < count_w);
-    if (side == Side::BLACK) {
-        return result;
-    } else {
-        return -result;
-    }
+    // float result = (count_b > count_w) - (count_b < count_w);
+    // if (side == Side::BLACK) {
+    //     return result;
+    // } else {
+    //     return -result;
+    // }
+    return (count_b - count_w) / 64.0;
 }
 
 BitBoard Board::get_black_board() const {

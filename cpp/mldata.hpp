@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "board.hpp"
 #include "node.hpp"
 

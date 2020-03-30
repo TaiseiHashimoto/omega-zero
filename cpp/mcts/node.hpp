@@ -2,6 +2,8 @@
 
 #include <ostream>
 #include <random>
+#include <map>
+#include <list>
 
 #include "board.hpp"
 
@@ -56,3 +58,32 @@ private:
 };
 
 std::ostream& operator<<(std::ostream& os, const GameNode& node);
+
+
+// class Cache
+// {
+// public:
+//     Cache(int cache_size);
+//     void update();
+
+// private:
+//     std::map<BitBoard, std::list<std::vector<float>>::iterator> m_keys;
+//     std::list<std::vector<float>> m_values;  // front is newest
+// }
+
+// void Cache::update(BitBoard bitboard, const std::vector<float>& priors, float value) {
+//     auto k_itr = m_keys.find(bitboard);
+//     std::vector v;
+//     if (k_itr != m_keys.end()) {  // already exist
+//         std::vector tmp;
+//         v = *k_itr;
+//         tmp = *m_values
+//         m_keys.erase(k_itr);
+//         m_keys.push_front(v);  // move to front
+//         return;
+//     }
+//     v = priors;
+//     v.push_back()
+//     m_values.push_front(value);
+//     m_keys[bitboard] = 
+// }

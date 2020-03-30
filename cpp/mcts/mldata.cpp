@@ -23,6 +23,7 @@ void pack_data(GameNode* node, float result, entry_t &entry) {
 
 void save_game(std::vector<GameNode*> &history, float result, const char* file_name) {
     // result: soft result from black side
+    printf("file_name = %s %d\n", file_name, history.size());
     std::ofstream file(file_name, std::ios::binary | std::ios::app);
     for (auto node : history) {
         entry_t entry;

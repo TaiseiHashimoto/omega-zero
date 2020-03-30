@@ -38,4 +38,4 @@ struct OmegaNetImpl : torch::nn::Module {
 TORCH_MODULE(OmegaNet);
 
 void init_model(short int device_idx);
-void inference(const input_t *recv_data, output_t *send_data);
+void inference(int n_thread, const input_t *recv_data, output_t *send_data);

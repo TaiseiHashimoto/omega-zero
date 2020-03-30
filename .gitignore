@@ -9,3 +9,4 @@ record.txt
 *.sublime-workspace
 model/*
 *.pt
+sftp-config.json

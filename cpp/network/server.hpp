@@ -4,12 +4,11 @@
 #include <vector>
 
 #include "board.hpp"
-#include "mcts.hpp"
 
 
 #define UNIXDOMAIN_PATH "/tmp/reversi_server.sock"
-#define TIMEOUT_USEC 1000
-#define MAX_TIMEOUT 2
+#define TIMEOUT_USEC 500
+#define MAX_TIMEOUT 1
 
 
 typedef struct {

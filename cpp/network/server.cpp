@@ -3,6 +3,7 @@
 #include <thread>
 #include <cstring>
 #include <cstdarg>
+#include <chrono>
 #include <unistd.h>
 #include <sys/select.h>
 #include <sys/time.h>
@@ -57,35 +58,47 @@ void run_server(int n_thread, int pipe_fd, short int device_idx) {
 
     std::vector<int> client_socks(n_thread);
     int listen_sock = connect_to_clients(n_thread, pipe_fd, client_socks);
-    printf("accepted %d clients\n", N_THREAD);
+    printf("accepted %d clients\n", n_thread);
 
     // initialization for select()
     int maxfd = 0;
     fd_set fds_org;
     FD_ZERO(&fds_org);
-    for (int i = 0; i < N_THREAD; i++) {
+    for (int i = 0; i < n_thread; i++) {
         FD_SET(client_socks[i], &fds_org);
         maxfd = std::max(client_socks[i], maxfd);
     }
 
+    // static double total_time = 0;
+
     int retval;
     int n_disc = 0;
 
+    input_t *recv_data = new input_t[n_thread];
+    output_t *send_data = new output_t[n_thread];
+
+    static int total_count = 0;  // total count of inference
+    std::chrono::system_clock::time_point start, end;
+    float elapsed;  // msec
+    float work_time = 1.0;  // msec
+    float occupancy_rate = 0.5;
+
     while (true) {  // loop until all clients disconnect
-        input_t recv_data[N_THREAD];
         std::vector<int> to_respond;
         int n_recv = 0;
         int timeout_count = 0;
 
+        start = std::chrono::system_clock::now();
+
         // receive data
-        while (n_recv + n_disc < N_THREAD && timeout_count < MAX_TIMEOUT) {
+        while (n_recv + n_disc < n_thread && timeout_count < MAX_TIMEOUT) {
             fd_set fds = fds_org;
             if (n_recv == 0) {    // no waiting client
                 retval = select(maxfd+1, &fds, NULL, NULL, NULL);
             } else {
                 struct timeval tv;
                 tv.tv_sec = 0;
-                tv.tv_usec = TIMEOUT_USEC;
+                tv.tv_usec = TIMEOUT_USEC;  // TODO: better way?
                 retval = select(maxfd+1, &fds, NULL, NULL, &tv);
                 timeout_count += 1;
             }
@@ -98,7 +111,7 @@ void run_server(int n_thread, int pipe_fd, short int device_idx) {
                 continue;
             }
 
-            for (int i = 0; i < N_THREAD; i++) {
+            for (int i = 0; i < n_thread; i++) {
                 if (FD_ISSET(client_socks[i], &fds)) {
                     char buf[100];
                     memset(buf, 0, sizeof(buf));
@@ -125,12 +138,14 @@ void run_server(int n_thread, int pipe_fd, short int device_idx) {
             // printf("timeout_count = %d, n_recv = %d\n", timeout_count, n_recv);
         }
 
-        if (n_disc == N_THREAD) {  // all clients disconnected
+        if (n_disc == n_thread) {  // all clients disconnected
             break;
         }
 
-        output_t send_data[N_THREAD];
-        inference(recv_data, send_data);
+        occupancy_rate = 0.99 * occupancy_rate + (0.01 * n_recv) / n_thread;
+
+        start = std::chrono::system_clock::now();
+        inference(n_thread, recv_data, send_data);
 
         // send data
         for (int idx : to_respond) {
@@ -140,10 +155,21 @@ void run_server(int n_thread, int pipe_fd, short int device_idx) {
                 exit(-1);
             }
         }
-        // fprintf(stdout, "---\n");
+
+        end = std::chrono::system_clock::now();
+        elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() * 1e-3;
+        work_time = work_time * 0.99 + elapsed * 0.01;
+
+        total_count += 1;
+        if (total_count % 1000 == 0) {
+            printf("%d: occupancy_rate=%f, work_time=%f\n", total_count, occupancy_rate, work_time);
+        }
     }
 
-    for (int i = 0; i < N_THREAD; i++) {
+    delete[] recv_data;
+    delete[] send_data;
+
+    for (int i = 0; i < n_thread; i++) {
         close(client_socks[i]);
     }
     close(listen_sock);

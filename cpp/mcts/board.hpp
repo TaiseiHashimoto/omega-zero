@@ -70,7 +70,7 @@ public:
     void set_boards(BitBoard player_board, BitBoard opponent_board, Side side);
 
 private:
-    int m_disk_num;  // 現在の石数
+    int m_disk_num;  // current total disk num
     BitBoard m_black_board;
     BitBoard m_white_board;
 };

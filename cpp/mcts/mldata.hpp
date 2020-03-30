@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "board.hpp"
 #include "node.hpp"
 
@@ -15,5 +17,5 @@ typedef struct {
     float posteriors[64];
 } entry_t;
 
-void pack_data(Node *node, float result, entry_t& output);
-void save_game(std::vector<Node*>& game_path, float result, const char* file_name);
+void pack_data(GameNode *node, float result, entry_t& output);
+void save_game(std::vector<GameNode*>& history, float result, const char* file_name);

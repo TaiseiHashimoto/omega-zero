@@ -76,7 +76,7 @@ std::ostream& operator<<(std::ostream& os, Action action)
         os << "BACK";
     } else if (action == SpetialAction::INVALID) {
         os << "INVALID";
-    } else if (action >= 0 && action < 64) {
+    } else if (action < 64) {
         os << static_cast<char>('a' + action % 8) << static_cast<char>('1' + action / 8);
     } else {
         fprintf(stderr, "unknown action (%d)\n", action);
@@ -196,12 +196,12 @@ float Board::get_result(Side side) const {
     int count_w = this->count(CellState::WHITE);
     // 1 if black win, -1 if white win, 0 if draw
     // float result = (count_b > count_w) - (count_b < count_w);
-    // if (side == Side::BLACK) {
-    //     return result;
-    // } else {
-    //     return -result;
-    // }
-    return (count_b - count_w) / 64.0;
+    float result = (count_b - count_w) / 64.0;
+    if (side == Side::BLACK) {
+        return result;
+    } else {
+        return -result;
+    }
 }
 
 BitBoard Board::get_black_board() const {

@@ -3,11 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class Flatten(nn.Module):
-    def forward(self, x):
-        return x.view(x.size(0), -1)
-
-
 class ResBlock(nn.Module):
     def __init__(self, n_filter):
         super().__init__()
@@ -36,14 +31,12 @@ class OmegaNet(nn.Module):
             nn.ReLU(inplace=True)
         )
 
-        self.res_blocks = nn.ModuleList()
-        for i in range(n_res_block):
-            self.res_blocks.append(ResBlock(res_filter))
-        
+        self.res_blocks = nn.Sequential(*[ResBlock(res_filter) for i in range(n_res_block)])
+
         self.policy_head = nn.Sequential(
             nn.Conv2d(res_filter, head_filter, kernel_size=1, padding=0),
             nn.BatchNorm2d(head_filter),
-            Flatten(),
+            nn.Flatten(),
             nn.ReLU(inplace=True),
             nn.Linear(head_filter * board_size ** 2, n_action)
         )
@@ -51,7 +44,7 @@ class OmegaNet(nn.Module):
         self.value_head = nn.Sequential(
             nn.Conv2d(res_filter, head_filter, kernel_size=1, padding=0),
             nn.BatchNorm2d(head_filter),
-            Flatten(),
+            nn.Flatten(),
             nn.ReLU(inplace=True),
             nn.Linear(head_filter * board_size ** 2, value_hidden),
             nn.ReLU(inplace=True),
@@ -61,11 +54,8 @@ class OmegaNet(nn.Module):
     def forward(self, black_board, white_board, side, legal_flags):
         side_board = torch.ones_like(black_board) * side[:, None, None]
         x = torch.stack([black_board, white_board, side_board], dim=1)
-        
-        x = self.conv(x)
-        for block in self.res_blocks:
-            x = block(x)
-        
+        x = self.res_blocks(self.conv(x))
+
         policy_logit = self.policy_head(x)
         policy_logit = policy_logit + (legal_flags + 1e-45).log()
         policy_logit = F.log_softmax(policy_logit, dim=1)

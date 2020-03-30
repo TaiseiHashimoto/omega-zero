@@ -4,57 +4,26 @@
 #include <cstring>
 #include <cstdarg>
 #include <unistd.h>
+#include <sys/select.h>
+#include <sys/time.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#include "network.hpp"
-#include "mcts.hpp"
+#include "server.hpp"
+#include "model.hpp"
 #include "board.hpp"
-#include "misc.hpp"
+
+
+#define PIPE_READ  0
+#define PIPE_WRITE 1
 
 
 namespace {
 
 struct sockaddr_un server_addr;
 
-}
-
-pid_t create_server_process() {
-    init_addr();
-    pid_t pid = fork();
-    if (pid < 0) {
-        fprintf(stderr, "fork error\n");
-        exit(-1);
-    } else if (pid == 0) {
-        run_server();
-        printf("server exit\n");
-        exit(0);
-    }
-    // wait for server to start
-    sleep(1);
-    return pid;
-}
-
-void init_addr() {
-    memset(&server_addr, 0, sizeof(struct sockaddr_un));
-    server_addr.sun_family = AF_UNIX;
-    strcpy(server_addr.sun_path, UNIXDOMAIN_PATH);
-}
-
-int connect_to_server() {
-    int server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (server_sock < 0){
-        fprintf(stderr, "socket error %s\n", strerror(errno));
-        exit(-1);
-    }
-    if (connect(server_sock, (struct sockaddr *)&server_addr, sizeof(struct sockaddr_un)) < 0){
-        fprintf(stderr, "connect error %s\n", strerror(errno));
-        exit(-1);
-    }
-    return server_sock;
-}
-
-int connect_to_clients(int* client_socks) {
+int connect_to_clients(int n_thread, int pipe_fd, std::vector<int>& client_socks) {
     int listen_sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (listen_sock < 0){
         fprintf(stderr, "socket error %s\n", strerror(errno));
@@ -68,7 +37,10 @@ int connect_to_clients(int* client_socks) {
         fprintf(stderr, "listen error %s\n", strerror(errno));
         exit(-1);
     }
-    for (int i = 0; i < N_THREAD; i++) {
+
+    write(pipe_fd, "DONE", 4);  // send done message to parent process
+
+    for (int i = 0; i < n_thread; i++) {
         client_socks[i] = accept(listen_sock, NULL, NULL);
         if(client_socks[i] < 0){
             fprintf(stderr, "accept error %s\n", strerror(errno));
@@ -78,42 +50,18 @@ int connect_to_clients(int* client_socks) {
     return listen_sock;
 }
 
-void request(int server_sock, const Board board, const Side side, const std::vector<bool>& legal_flags, std::vector<float>& priors, float& value) {
-    int retval;
-
-    input_t send_data;
-    send_data.black_board = board.get_black_board();
-    send_data.white_board = board.get_white_board();
-    send_data.side = side;
-    std::copy(legal_flags.begin(), legal_flags.end(), std::begin(send_data.legal_flags));
-
-    retval = write(server_sock, &send_data, sizeof(input_t));
-    if (retval < 0){
-        fprintf(stderr, "write error %s\n", strerror(errno));
-        exit(-1);
-    }
-
-    output_t recv_data;
-    retval = read(server_sock, &recv_data, sizeof(output_t));
-    if (retval < 0){
-        fprintf(stderr, "read error %s\n", strerror(errno));
-        exit(-1);
-    }
-
-    std::copy(std::begin(recv_data.priors), std::end(recv_data.priors), priors.begin());
-    value = recv_data.value;
-}
-
-void run_server() {
+void run_server(int n_thread, int pipe_fd, short int device_idx) {
+    printf("server start\n");
     unlink(UNIXDOMAIN_PATH);  // remove file
+    init_model(device_idx);
 
-    int client_socks[N_THREAD];
-    int listen_sock = connect_to_clients(client_socks);
-    // fprintf(stdout, "accepted %d clients\n", N_THREAD);
+    std::vector<int> client_socks(n_thread);
+    int listen_sock = connect_to_clients(n_thread, pipe_fd, client_socks);
+    printf("accepted %d clients\n", N_THREAD);
 
     // initialization for select()
-    fd_set fds_org;
     int maxfd = 0;
+    fd_set fds_org;
     FD_ZERO(&fds_org);
     for (int i = 0; i < N_THREAD; i++) {
         FD_SET(client_socks[i], &fds_org);
@@ -182,31 +130,7 @@ void run_server() {
         }
 
         output_t send_data[N_THREAD];
-        // process data (treat all clients equally)
-        for (int i = 0; i < N_THREAD; i++) {
-            int n_legal_action = 0;
-            for (int j = 0; j < 64; j++) {
-                if (recv_data[i].legal_flags[j]) {
-                    n_legal_action += 1;
-                }
-            }
-            for (int j = 0; j < 64; j++) {
-                if (recv_data[i].legal_flags[j]) {
-                    send_data[i].priors[j] = 1.0 / n_legal_action;
-                } else {
-                    send_data[i].priors[j] = 0.0;
-                }
-            }
-
-            int black_c = bit_count(recv_data[i].black_board);
-            int white_c = bit_count(recv_data[i].white_board);
-            if (recv_data[i].side == Side::BLACK) {
-                send_data[i].value = (black_c - white_c) / 64.0;
-            } else {
-                send_data[i].value = (white_c - black_c) / 64.0;
-            }
-            // sprintf(send_data[i].num_s, "%d", recv_data[i].num_i);
-        }
+        inference(recv_data, send_data);
 
         // send data
         for (int idx : to_respond) {
@@ -223,4 +147,89 @@ void run_server() {
         close(client_socks[i]);
     }
     close(listen_sock);
+}
+
+}  // namespace
+
+
+pid_t create_server_process(int n_thread, short int device_idx) {
+    // initialize server address
+    memset(&server_addr, 0, sizeof(struct sockaddr_un));
+    server_addr.sun_family = AF_UNIX;
+    strcpy(server_addr.sun_path, UNIXDOMAIN_PATH);
+
+    // create pipe to receive sign of preparation completion
+    int pipe_c2p[2];
+    if (pipe(pipe_c2p) < 0) {
+        fprintf(stderr, "pipe error %s\n", strerror(errno));
+        exit(-1);
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        fprintf(stderr, "fork error %s\n", strerror(errno));
+        close(pipe_c2p[PIPE_READ]);
+        close(pipe_c2p[PIPE_WRITE]);
+        exit(-1);
+    } else if (pid == 0) {  // child process
+        run_server(n_thread, pipe_c2p[PIPE_WRITE], device_idx);
+        printf("server exit\n");
+        exit(0);
+    }
+
+    // wait for server to start
+    char buf[4];
+    int retval = read(pipe_c2p[PIPE_READ], buf, 4);
+    if (retval <= 0) {
+        fprintf(stderr, "read error %s\n", strerror(errno));
+        exit(-1);
+    }
+    if (strcmp(buf, "DONE") != 0) {
+        fprintf(stderr, "message error \"%s\" != \"DONE\"\n", buf);
+    }
+    // printf("received \"%s\" from server\n", buf);
+    close(pipe_c2p[0]);
+    close(pipe_c2p[1]);
+
+    return pid;
+}
+
+int connect_to_server() {
+    int server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (server_sock < 0){
+        fprintf(stderr, "socket error %s\n", strerror(errno));
+        exit(-1);
+    }
+    if (connect(server_sock, (struct sockaddr *)&server_addr, sizeof(struct sockaddr_un)) < 0){
+        fprintf(stderr, "connect error %s\n", strerror(errno));
+        exit(-1);
+    }
+    return server_sock;
+}
+
+
+void request(int server_sock, const Board board, const Side side, const std::vector<bool>& legal_flags, std::vector<float>& priors, float& value) {
+    int retval;
+    input_t send_data;
+    send_data.black_board = board.get_black_board();
+    send_data.white_board = board.get_white_board();
+    send_data.side = side;
+    std::copy(legal_flags.begin(), legal_flags.end(), std::begin(send_data.legal_flags));
+
+    retval = write(server_sock, &send_data, sizeof(input_t));
+    if (retval < 0){
+        fprintf(stderr, "write error %s\n", strerror(errno));
+        exit(-1);
+    }
+
+    output_t recv_data;
+    retval = read(server_sock, &recv_data, sizeof(output_t));
+    if (retval < 0){
+        fprintf(stderr, "read error %s\n", strerror(errno));
+        exit(-1);
+    }
+    assert(retval > 0);
+
+    std::copy(std::begin(recv_data.priors), std::end(recv_data.priors), priors.begin());
+    value = recv_data.value;
 }

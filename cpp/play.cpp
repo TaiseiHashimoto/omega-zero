@@ -7,7 +7,7 @@
 
 #include "node.hpp"
 #include "mcts.hpp"
-#include "network.hpp"
+#include "server.hpp"
 #include "misc.hpp"
 
 
@@ -16,8 +16,7 @@ int main(int argc, char const *argv[]) {
         fprintf(stderr, "Please specify record file name\n");
         exit(-1);
     }
-    const char *file_name = argv[1];
-    std::ofstream file(file_name);
+    std::ofstream file(argv[1]);
 
     pid_t server_pid = create_server_process();
     (void)server_pid;
@@ -42,15 +41,15 @@ int main(int argc, char const *argv[]) {
 
     std::random_device seed_gen;
     std::default_random_engine engine(seed_gen());
-    std::vector<Node*> history;
+    std::vector<GameNode*> history;
 
     Board board;
     Side side = Side::BLACK;
-    Node* root = new Node(board, Side::BLACK, 0);
+    GameNode* root = new GameNode(board, Side::BLACK, 0);
     root->expand(server_sock);
     root->backpropagete(root->value(), root);
 
-    Node* current_node = root;
+    GameNode* current_node = root;
     std::cout << current_node->board() << "\n";
     history.push_back(current_node);
 
@@ -94,16 +93,17 @@ int main(int argc, char const *argv[]) {
                         break;
                     }
                 }
-                assert(selected >= 0 and selected < legal_actions.size());
+                assert(selected < legal_actions.size());
                 current_node = current_node->children()[selected];
                 side = flip_side(side);
             }
         }
 
-        std::cout << side << " : " << action << "\n";
+        std::cout << side << " : " << action << "\n\n";
         // std::cout << current_node->board() << "\n";
         std::cout << *current_node << "\n";
         file << action << "\n";
+        file.flush();
         if (current_node->terminal()) {
             break;
         }

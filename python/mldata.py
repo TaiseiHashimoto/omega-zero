@@ -16,10 +16,12 @@ class Entry(ctypes.Structure):
     ]
 
 class DataLoader:
-    def __init__(self, file_names, batch_size, n_iter):
+    def __init__(self, file_names, batch_size, n_iter, device):
         self.file_names = file_names
         self.batch_size = batch_size
         self.n_iter = n_iter
+        self.device = device
+
         self.entry_size = ctypes.sizeof(Entry)
         self.pos_binary = np.array([1 << i for i in range(64)], dtype=np.uint64)
 
@@ -35,7 +37,7 @@ class DataLoader:
         for file_name, n_entry in zip(file_names, self.n_entries):
             print(f"{file_name} : {n_entry}")
         print(f"total : {self.total_entry}")
-    
+
     def __iter__(self):
         return self
     
@@ -82,14 +84,14 @@ class DataLoader:
         white_board_flat_b = (white_bitboard_b[:, None] & self.pos_binary > 0).astype(np.float32)
         black_board_b = black_board_flat_b.reshape((-1, 8, 8))
         white_board_b = white_board_flat_b.reshape((-1, 8, 8))
-        black_board_b = torch.tensor(black_board_b, device=device)
-        white_board_b = torch.tensor(white_board_b, device=device)
 
-        side_b = torch.tensor(side_b, dtype=torch.float32, device=device)
-        legal_flags_b = torch.tensor(legal_flags_b, dtype=np.float)
-        result_b = np.array(result_b, dtype=np.float32)
-        Q_b = np.array(Q_b, dtype=np.float32)
-        posteriors_b = np.array(posteriors_b, dtype=np.float32)
+        black_board_b = torch.tensor(black_board_b, device=self.device)
+        white_board_b = torch.tensor(white_board_b, device=self.device)
+        side_b = torch.tensor(side_b, dtype=torch.float, device=self.device)
+        legal_flags_b = torch.tensor(legal_flags_b, dtype=torch.float, device=self.device)
+        result_b = torch.array(result_b, dtype=torch.float, device=self.device)
+        Q_b = torch.array(Q_b, dtype=torch.float, device=self.device)
+        posteriors_b = torch.array(posteriors_b, dtype=torch.float, device=self.device)
         # action_b = torch.tensor(action_b, dtype=np.uint8)
         
         self.iter_count += 1

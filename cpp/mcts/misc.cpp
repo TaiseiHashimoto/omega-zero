@@ -12,7 +12,7 @@
 void p() {
     std::cout << "\n";
 }
-void p(Node* node) {
+void p(GameNode* node) {
     std::cout << *node;
 }
 

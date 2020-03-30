@@ -5,3 +5,7 @@ record.txt
 *.dat
 .ipynb_checkpoints/
 *.ipynb
+*.sublime-project
+*.sublime-workspace
+model/*
+*.pt

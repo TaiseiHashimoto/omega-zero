@@ -6,18 +6,18 @@
 #include "board.hpp"
 
 
-class Node
+class GameNode
 {
 public:
-    Node(Board board, Side side, float prior, Node* parent = NULL);
-    ~Node();
+    GameNode(Board board, Side side, float prior, GameNode* parent = NULL);
+    ~GameNode();
 
 
     // getter
     const Board& board() const;
     Side side() const;
-    Node* parent() const;
-    std::vector<Node*>& children();
+    GameNode* parent() const;
+    std::vector<GameNode*>& children();
     int N() const;
     float Q() const;
     float prior() const;
@@ -32,17 +32,17 @@ public:
 
     void expand(int server_sock);
     void add_children(const std::vector<float>& priors);
-    Node* select_child() const;
-    void backpropagete(float value, Node* stop_node);
-    Node* next_node(std::default_random_engine &engine);
+    GameNode* select_child() const;
+    void backpropagete(float value, GameNode* stop_node);
+    GameNode* next_node(std::default_random_engine &engine);
     void add_exploration_noise(std::default_random_engine &engine);
     void set_prior(const float prior);
 
 private:
     Board m_board;
     Side m_side;
-    Node* m_parent;
-    std::vector<Node*> m_children;
+    GameNode* m_parent;
+    std::vector<GameNode*> m_children;
     int m_N;
     float m_Q;
     float m_prior;
@@ -55,4 +55,4 @@ private:
     std::vector<float> m_posteriors;
 };
 
-std::ostream& operator<<(std::ostream& os, const Node& node);
+std::ostream& operator<<(std::ostream& os, const GameNode& node);

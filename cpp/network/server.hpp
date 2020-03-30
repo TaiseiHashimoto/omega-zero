@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "board.hpp"
+#include "mcts.hpp"
 
 
 #define UNIXDOMAIN_PATH "/tmp/reversi_server.sock"
@@ -24,12 +25,8 @@ typedef struct {
 } output_t;
 
 
-pid_t create_server_process();
-void init_addr();
+pid_t create_server_process(int n_thread = 1, short int device_idx = 0);
 
 int connect_to_server();
-int connect_to_clients(int* client_socks);
 
 void request(int server_sock, const Board board, const Side side, const std::vector<bool>& legal_flags, std::vector<float>& priors, float& value);
-
-void run_server();

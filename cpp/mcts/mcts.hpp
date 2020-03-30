@@ -16,7 +16,5 @@
 // #define DIRICHLET_ALPHA 0.0
 // #define TAU 1.0
 
-
-void collect_mldata(const char *file_name);
-void play_game(int server_sock, std::vector<Node*>& history, std::default_random_engine& engine);
-Node *run_mcts(Node *current_node, int server_sock, std::default_random_engine& engine);
+void play_game(int server_sock, std::vector<GameNode*>& history, std::default_random_engine& engine);
+GameNode *run_mcts(GameNode *current_node, int server_sock, std::default_random_engine& engine);

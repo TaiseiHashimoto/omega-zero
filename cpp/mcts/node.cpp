@@ -6,11 +6,11 @@
 
 #include "node.hpp"
 #include "mcts.hpp"
-#include "network.hpp"
+#include "server.hpp"
 #include "misc.hpp"
 
 
-Node::Node(Board board, Side side, float prior, Node* parent) {
+GameNode::GameNode(Board board, Side side, float prior, GameNode* parent) {
     m_board = board;
     m_side = side;
     m_parent = parent;
@@ -25,74 +25,74 @@ Node::Node(Board board, Side side, float prior, Node* parent) {
     m_posteriors.resize(64, 0);
 }
 
-Node::~Node() {
+GameNode::~GameNode() {
     for (auto& child : m_children) {
         safe_delete(child);
     }
 }
 
-int Node::N() const {
+int GameNode::N() const {
     return m_N;
 }
 
-float Node::Q() const {
+float GameNode::Q() const {
     return m_Q;
 }
 
-float Node::prior() const {
+float GameNode::prior() const {
     return m_prior;
 }
 
-float Node::value() const {
+float GameNode::value() const {
     return m_value;
 }
 
-const Board& Node::board() const {
+const Board& GameNode::board() const {
     return m_board;
 }
 
-const std::vector<Action>& Node::legal_actions() const {
+const std::vector<Action>& GameNode::legal_actions() const {
     return m_legal_actions;
 }
 
-const std::vector<bool>& Node::legal_flags() const {
+const std::vector<bool>& GameNode::legal_flags() const {
     return m_legal_flags;
 }
 
-const std::vector<float>& Node::posteriors() const {
+const std::vector<float>& GameNode::posteriors() const {
     return m_posteriors;
 }
 
-Node* Node::parent() const {
+GameNode* GameNode::parent() const {
     return m_parent;
 }
 
-Side Node::side() const {
+Side GameNode::side() const {
     return m_side;
 }
 
-std::vector<Node*>& Node::children()  {
+std::vector<GameNode*>& GameNode::children()  {
     return m_children;
 }
 
-bool Node::expanded() const {
+bool GameNode::expanded() const {
     return m_children.size() > 0;
 }
 
-bool Node::pass() const {
+bool GameNode::pass() const {
     return m_pass;
 }
 
-bool Node::terminal() const {
+bool GameNode::terminal() const {
     return m_terminal;
 }
 
-Action Node::action() const {
+Action GameNode::action() const {
     return m_action;
 }
 
 
-void Node::expand(int server_sock) {
+void GameNode::expand(int server_sock) {
     // get all legal actions and check pass
     m_legal_actions = m_board.get_all_legal_actions(m_side);
     for (auto action : m_legal_actions) {
@@ -101,7 +101,6 @@ void Node::expand(int server_sock) {
     m_pass = (m_legal_actions.size() == 0);  // no legal action
 
     // terminal if double pass or no empty cell
-    // m_terminal = (m_board.get_disk_num() >= 6);
     m_terminal = (m_parent && (m_pass && m_parent->pass())) || m_board.is_full();
     if (m_terminal) {
         m_value = m_board.get_result(m_side);  // substitute result for NN output
@@ -116,23 +115,23 @@ void Node::expand(int server_sock) {
     add_children(priors);
 }
 
-void Node::add_children(const std::vector<float>& priors) {
+void GameNode::add_children(const std::vector<float>& priors) {
     if (m_pass) {
         Board new_board(m_board);
-        Node* child_node = new Node(new_board, flip_side(m_side), 1.0, this);
+        GameNode* child_node = new GameNode(new_board, flip_side(m_side), 1.0, this);
         m_children.push_back(child_node);
     } else {
         for (unsigned int i = 0; i < m_legal_actions.size(); i++) {
             auto action = m_legal_actions[i];
             Board new_board(m_board);
             new_board.place_disk(action, m_side);
-            Node* child_node = new Node(new_board, flip_side(m_side), priors[action], this);
+            GameNode* child_node = new GameNode(new_board, flip_side(m_side), priors[action], this);
             m_children.push_back(child_node);
         }
     }
 }
 
-void Node::backpropagete(float value, Node* stop_node) {
+void GameNode::backpropagete(float value, GameNode* stop_node) {
     m_Q = (m_Q * m_N + value) / (m_N + 1);
     m_N += 1;
 
@@ -144,9 +143,9 @@ void Node::backpropagete(float value, Node* stop_node) {
     }
 }
 
-Node* Node::select_child() const {
-    float max_score = -1;  // -1 <= score <= 1
-    Node* selected;
+GameNode* GameNode::select_child() const {
+    float max_score = -1;  // -1 <= score
+    GameNode* selected = nullptr;
     // printf("selecting...\n");
     // int i = 0;
     for (const auto& child : m_children) {
@@ -154,21 +153,20 @@ Node* Node::select_child() const {
         // TODO: log term necessary?
         float prior_score = child->prior() * std::sqrt(m_N) / (child->N() + 1);
         float score = value_score + C_PUCT * prior_score;
-
         // std::cout << m_legal_actions[i] << ":(" << value_score << "," << prior_score << ") ";
         // i++;
-
         if (max_score < score) {
             max_score = score;
             selected = child;
         }
     }
+    assert(selected != nullptr);
     // p();
     return selected;
 }
 
 // return next node, set m_action and m_posteriors
-Node* Node::next_node(std::default_random_engine &engine) {
+GameNode* GameNode::next_node(std::default_random_engine &engine) {
     if (m_pass) {
         assert(m_children.size() == 1);
         m_action = SpetialAction::PASS;
@@ -184,7 +182,7 @@ Node* Node::next_node(std::default_random_engine &engine) {
         ratio_sum += ratio;
     }
 
-    unsigned int selected;
+    unsigned int selected=1000;  // TODO: delete initialization
     unsigned int n_children = m_children.size();
 
     assert(ratio_sum >= 1.0);
@@ -199,7 +197,7 @@ Node* Node::next_node(std::default_random_engine &engine) {
         }
         rnd -= ratios[i];
     }
-    assert(selected >= 0 && selected < ratios.size());
+    assert(selected < ratios.size());
     m_action = m_legal_actions[selected];
 
     // calculate posterior
@@ -216,7 +214,7 @@ Node* Node::next_node(std::default_random_engine &engine) {
     return m_children[selected];
 }
 
-void Node::add_exploration_noise(std::default_random_engine &engine) {
+void GameNode::add_exploration_noise(std::default_random_engine &engine) {
     int n = m_children.size();
     std::vector<float> noise(n);
     // TODO: delete case 0
@@ -233,12 +231,12 @@ void Node::add_exploration_noise(std::default_random_engine &engine) {
     }
 }
 
-void Node::set_prior(const float prior) {
+void GameNode::set_prior(const float prior) {
     m_prior = prior;
 }
 
 
-std::ostream& operator<<(std::ostream& os, const Node& node) {
+std::ostream& operator<<(std::ostream& os, const GameNode& node) {
     os << node.board();
     if (node.expanded()) {
         if (node.legal_actions().size() > 0) {

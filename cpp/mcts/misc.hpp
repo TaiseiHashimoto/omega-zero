@@ -9,7 +9,7 @@
 
 
 void p();
-void p(Node* node);
+void p(GameNode* node);
 template<class Head, class... Body>
 void p(Head head, Body... body) {
     std::cout << head;

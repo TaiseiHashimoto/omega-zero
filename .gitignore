@@ -10,3 +10,4 @@ record.txt
 model/*
 *.pt
 sftp-config.json
+__pycache__/

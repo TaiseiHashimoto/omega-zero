@@ -27,3 +27,5 @@ void random_dirichlet(std::default_random_engine &engine, const float alpha, std
 Action parse_action(std::string input);
 
 int bit_count(uint64_t x);
+
+void get_root_path(const char *program_name, char *output);

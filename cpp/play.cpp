@@ -2,6 +2,7 @@
 #include <fstream>
 #include <string>
 #include <random>
+#include <cstdlib>
 #include <cassert>
 #include <unistd.h>
 
@@ -11,14 +12,23 @@
 #include "misc.hpp"
 
 
-int main(int argc, char const *argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "Please specify record file name\n");
+int main(int argc, char *argv[]) {
+    if (argc != 4) {
+        fprintf(stderr, "Usage: play [generation] [n_simulation] [record_fname]\n");
         exit(-1);
     }
-    std::ofstream file(argv[1]);
+    int generation = atoi(argv[1]);
+    int n_simulation = atoi(argv[2]);
+    const char *record_fname = argv[3];
 
-    pid_t server_pid = create_server_process();
+    std::ofstream file(record_fname);
+
+    char root_path[100];
+    get_root_path(argv[0], root_path);
+    char model_fname[100];
+    sprintf(model_fname, "%s/model/model_jit_%d.pt", root_path, generation);
+
+    pid_t server_pid = create_server_process(/*n_thread=*/1, model_fname, /*device_idx=*/0);
     (void)server_pid;
     int server_sock = connect_to_server();  // NN server
 
@@ -56,10 +66,9 @@ int main(int argc, char const *argv[]) {
     Action action;
     for (int move_count = 0;; move_count++) {
         if (side == comp_side) {
-            current_node = run_mcts(current_node, server_sock, engine);
+            current_node = run_mcts(current_node, n_simulation, server_sock, engine);
             history.push_back(current_node);
             action = current_node->parent()->action();
-            side = flip_side(side);
         } else {
             while (true) {
                 std::cout << "action ? ";
@@ -95,7 +104,10 @@ int main(int argc, char const *argv[]) {
                 }
                 assert(selected < legal_actions.size());
                 current_node = current_node->children()[selected];
-                side = flip_side(side);
+                if (!current_node->expanded()) {
+                    current_node->expand(server_sock);
+                    current_node->backpropagete(current_node->value(), current_node);
+                }
             }
         }
 
@@ -107,6 +119,7 @@ int main(int argc, char const *argv[]) {
         if (current_node->terminal()) {
             break;
         }
+        side = flip_side(side);
     }
 
     int count_b = current_node->board().count(CellState::BLACK);

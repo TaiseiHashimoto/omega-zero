@@ -84,7 +84,7 @@ namespace {
     OmegaNet omega_net{nullptr};
 }
 
-void init_model(short int device_idx) {
+void init_model(const char *model_fname, short int device_idx) {
     if (torch::cuda::is_available()) {
         // TODO: cpu fastter?
         device = {torch::kCUDA, device_idx};
@@ -93,12 +93,14 @@ void init_model(short int device_idx) {
 
     omega_net = OmegaNet(BOARD_SIZE, N_ACTION, N_RES_BLOCK, RES_FILTER, HEAD_FILTER, VALUE_HIDDEN);
     try {
-        torch::load(omega_net, MODEL_PATH);
+        printf("load model %s\n", model_fname);
+        torch::load(omega_net, model_fname);
     } catch (const c10::Error& e) {
         fprintf(stderr, "error loading the model\n");
         exit(-1);
     }
     omega_net->to(device);
+    omega_net->eval();
 }
 
 void inference(int n_thread, const input_t *recv_data, output_t *send_data) {

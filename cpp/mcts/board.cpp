@@ -89,6 +89,12 @@ Board::Board() {
     reset();
 }
 
+Board::Board(BitBoard black_board, BitBoard white_board) {
+    m_black_board = black_board;
+    m_white_board = white_board;
+    m_disk_num = bit_count(black_board) + bit_count(white_board);
+}
+
 CellState Board::loc(int col, int row) const {
     Action position = (Action)(col + row * 8);
     BitBoard pos = (BitBoard)1 << position;

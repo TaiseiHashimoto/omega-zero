@@ -8,7 +8,7 @@
 
 #define UNIXDOMAIN_PATH "/tmp/reversi_server.sock"
 #define TIMEOUT_USEC 500
-#define MAX_TIMEOUT 1
+#define MAX_TIMEOUT 4
 
 
 typedef struct {
@@ -24,7 +24,7 @@ typedef struct {
 } output_t;
 
 
-pid_t create_server_process(int n_thread = 1, short int device_idx = 0);
+pid_t create_server_process(int n_thread, const char *model_fname, short int device_idx);
 
 int connect_to_server();
 

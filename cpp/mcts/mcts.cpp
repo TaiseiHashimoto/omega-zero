@@ -10,7 +10,7 @@
 #include "misc.hpp"
 
 
-void play_game(int server_sock, std::vector<GameNode*>& history, std::default_random_engine& engine) {
+void play_game(int n_simulation, int server_sock, std::vector<GameNode*>& history, std::default_random_engine& engine) {
     Board board;
     GameNode *root = new GameNode(board, Side::BLACK, 0);
     root->expand(server_sock);
@@ -21,7 +21,7 @@ void play_game(int server_sock, std::vector<GameNode*>& history, std::default_ra
 
     for (int move_count = 0;; move_count++) {
         // printf("move_count = %d\n", move_count+1);
-        current_node = run_mcts(current_node, server_sock, engine);
+        current_node = run_mcts(current_node, n_simulation, server_sock, engine);
         // p(current_node);
         history.push_back(current_node);  // terminal node included
         if (current_node->terminal()) {
@@ -30,10 +30,10 @@ void play_game(int server_sock, std::vector<GameNode*>& history, std::default_ra
     }
 }
 
-GameNode *run_mcts(GameNode *current_node, int server_sock, std::default_random_engine& engine) {
+GameNode *run_mcts(GameNode *current_node, int n_simulation, int server_sock, std::default_random_engine& engine) {
     current_node->add_exploration_noise(engine);
 
-    for (int sim_count = 0; sim_count < N_SIMULATION; sim_count++) {
+    for (int sim_count = 0; sim_count < n_simulation; sim_count++) {
         GameNode* node = current_node;
         // printf("sim_count=%d\n", sim_count);
         while (node->expanded()) {  // terminal => not expanded

@@ -4,8 +4,13 @@
 #include <random>
 #include <map>
 #include <list>
+#include <tuple>
+#include <mutex>
 
 #include "board.hpp"
+
+
+#define USE_CACHE 0
 
 
 class GameNode
@@ -60,30 +65,37 @@ private:
 std::ostream& operator<<(std::ostream& os, const GameNode& node);
 
 
-// class Cache
-// {
-// public:
-//     Cache(int cache_size);
-//     void update();
+#if USE_CACHE
 
-// private:
-//     std::map<BitBoard, std::list<std::vector<float>>::iterator> m_keys;
-//     std::list<std::vector<float>> m_values;  // front is newest
-// }
+struct CacheKey {
+    Board board;
+    Side side;
+    bool operator<(const CacheKey& other) const;
+};
 
-// void Cache::update(BitBoard bitboard, const std::vector<float>& priors, float value) {
-//     auto k_itr = m_keys.find(bitboard);
-//     std::vector v;
-//     if (k_itr != m_keys.end()) {  // already exist
-//         std::vector tmp;
-//         v = *k_itr;
-//         tmp = *m_values
-//         m_keys.erase(k_itr);
-//         m_keys.push_front(v);  // move to front
-//         return;
-//     }
-//     v = priors;
-//     v.push_back()
-//     m_values.push_front(value);
-//     m_keys[bitboard] = 
-// }
+struct CacheValue {
+    std::vector<float> priors;
+    float value;
+};
+
+class Cache {
+public:
+    Cache(unsigned int max_size);
+    bool get(const Board& board, Side side, std::vector<float>&priors, float& value);
+    void add(const Board& node, Side side, const std::vector<float>& priors, float value);
+    std::tuple<int, int, int> stats();
+
+private:
+    unsigned int m_size;
+    std::mutex m_mtx;
+    std::map<CacheKey, std::list<std::pair<CacheKey, CacheValue>>::iterator> m_keys;
+    // key is neccesary to delete item
+    std::list<std::pair<CacheKey, CacheValue>> m_values;  // front is newest
+
+    unsigned int m_access_count;
+    unsigned int m_hit_count;
+};
+
+std::tuple<int, int, int> get_cache_stats();
+
+#endif

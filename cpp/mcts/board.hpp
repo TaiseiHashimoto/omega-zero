@@ -46,6 +46,7 @@ public:
     static const int HEIGHT = 8;
 
     Board();
+    Board(BitBoard black_board, BitBoard white_board);
 
     CellState loc(int col, int row) const;
 

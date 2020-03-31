@@ -18,4 +18,4 @@ typedef struct {
 } entry_t;
 
 void pack_data(GameNode *node, float result, entry_t& output);
-void save_game(std::vector<GameNode*>& history, float result, const char* file_name);
+void save_game(std::vector<GameNode*>& history, float result, const char* fname);

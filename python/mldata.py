@@ -15,6 +15,7 @@ class Entry(ctypes.Structure):
         ("posteriors", ctypes.c_float * 64),
     ]
 
+
 class DataLoader:
     def __init__(self, file_names, batch_size, n_iter, device):
         self.file_names = file_names
@@ -33,6 +34,7 @@ class DataLoader:
 
         self.total_entry = sum(self.n_entries)
         self.iter_count = 0
+        self.max_count = self.total_entry * n_iter // batch_size
 
         for file_name, n_entry in zip(file_names, self.n_entries):
             print(f"{file_name} : {n_entry}")
@@ -42,10 +44,10 @@ class DataLoader:
         return self
     
     def __len__(self):
-        return self.total_entry
+        return self.max_count
 
     def __next__(self):
-        if self.iter_count == self.n_iter:
+        if self.iter_count == self.max_count:
             for file in self.files:
                 file.close()
             raise StopIteration()
@@ -57,11 +59,11 @@ class DataLoader:
         result_b = []
         Q_b = []
         posteriors_b = []
-    #     action_b = []
 
         file_idx = np.random.choice(len(self.files))
         file = self.files[file_idx]
-        entry_idxs = np.random.choice(self.n_entries[file_idx], self.batch_size, replace=False)
+        batch_size = min(self.batch_size, self.n_entries[file_idx])
+        entry_idxs = np.random.choice(self.n_entries[file_idx], batch_size, replace=False)
         entry_idxs = np.sort(entry_idxs)
 
         for idx in entry_idxs:
@@ -76,7 +78,6 @@ class DataLoader:
             result_b.append(entry.result)
             Q_b.append(entry.Q)
             posteriors_b.append(entry.posteriors)
-            # action_b.append(entry.action)
 
         black_bitboard_b = np.array(black_bitboard_b, dtype=np.uint64)
         white_bitboard_b = np.array(white_bitboard_b, dtype=np.uint64)
@@ -89,10 +90,9 @@ class DataLoader:
         white_board_b = torch.tensor(white_board_b, device=self.device)
         side_b = torch.tensor(side_b, dtype=torch.float, device=self.device)
         legal_flags_b = torch.tensor(legal_flags_b, dtype=torch.float, device=self.device)
-        result_b = torch.array(result_b, dtype=torch.float, device=self.device)
-        Q_b = torch.array(Q_b, dtype=torch.float, device=self.device)
-        posteriors_b = torch.array(posteriors_b, dtype=torch.float, device=self.device)
-        # action_b = torch.tensor(action_b, dtype=np.uint8)
+        result_b = torch.tensor(result_b, dtype=torch.float, device=self.device)
+        Q_b = torch.tensor(Q_b, dtype=torch.float, device=self.device)
+        posteriors_b = torch.tensor(posteriors_b, dtype=torch.float, device=self.device)
         
         self.iter_count += 1
         return black_board_b, white_board_b, side_b, legal_flags_b, result_b, Q_b, posteriors_b

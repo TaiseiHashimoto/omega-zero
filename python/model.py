@@ -50,7 +50,7 @@ class OmegaNet(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(value_hidden, 1)
         )
-    
+
     def forward(self, black_board, white_board, side, legal_flags):
         side_board = torch.ones_like(black_board) * side[:, None, None]
         x = torch.stack([black_board, white_board, side_board], dim=1)

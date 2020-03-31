@@ -3,7 +3,10 @@
 #include <random>
 #include <vector>
 #include <string>
+#include <cstring>
 #include <algorithm>
+#include <unistd.h>
+#include <libgen.h>
 
 #include "board.hpp"
 #include "node.hpp"
@@ -61,4 +64,13 @@ int bit_count(uint64_t x) {
     x = ((x & 0xffffffff00000000) >> 32) 
       +  (x & 0x00000000ffffffff);
     return (int)x;
+}
+
+void get_root_path(const char *program_name, char *output) {
+    char *retval = realpath(program_name, output);
+    if (retval == NULL) {
+        fprintf(stderr, "realpath error %s\n", strerror(errno));
+    }
+    char *root_path = dirname(dirname(dirname(output)));
+    strcpy(output, root_path);
 }

@@ -10,7 +10,6 @@
 #define RES_FILTER 64
 #define HEAD_FILTER 32
 #define VALUE_HIDDEN 64
-#define MODEL_PATH "../../model/model.pt"
 
 
 struct ResBlockImpl : torch::nn::Module {
@@ -37,5 +36,5 @@ struct OmegaNetImpl : torch::nn::Module {
 
 TORCH_MODULE(OmegaNet);
 
-void init_model(short int device_idx);
+void init_model(const char *model_fname, short int device_idx);
 void inference(int n_thread, const input_t *recv_data, output_t *send_data);

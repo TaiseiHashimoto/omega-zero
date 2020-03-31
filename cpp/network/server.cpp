@@ -39,7 +39,11 @@ int connect_to_clients(int n_thread, int pipe_fd, std::vector<int>& client_socks
         exit(-1);
     }
 
-    write(pipe_fd, "DONE", 4);  // send done message to parent process
+    int retval = write(pipe_fd, "DONE", 4);  // send done message to parent process
+    if (retval < 0){
+        fprintf(stderr, "write error %s\n", strerror(errno));
+        exit(-1);
+    }
 
     for (int i = 0; i < n_thread; i++) {
         client_socks[i] = accept(listen_sock, NULL, NULL);
@@ -51,10 +55,10 @@ int connect_to_clients(int n_thread, int pipe_fd, std::vector<int>& client_socks
     return listen_sock;
 }
 
-void run_server(int n_thread, int pipe_fd, short int device_idx) {
+void run_server(int n_thread, int pipe_fd, const char *model_fname, short int device_idx) {
     printf("server start\n");
     unlink(UNIXDOMAIN_PATH);  // remove file
-    init_model(device_idx);
+    init_model(model_fname, device_idx);
 
     std::vector<int> client_socks(n_thread);
     int listen_sock = connect_to_clients(n_thread, pipe_fd, client_socks);
@@ -87,8 +91,6 @@ void run_server(int n_thread, int pipe_fd, short int device_idx) {
         std::vector<int> to_respond;
         int n_recv = 0;
         int timeout_count = 0;
-
-        start = std::chrono::system_clock::now();
 
         // receive data
         while (n_recv + n_disc < n_thread && timeout_count < MAX_TIMEOUT) {
@@ -142,7 +144,7 @@ void run_server(int n_thread, int pipe_fd, short int device_idx) {
             break;
         }
 
-        occupancy_rate = 0.99 * occupancy_rate + (0.01 * n_recv) / n_thread;
+        occupancy_rate = occupancy_rate * 0.99 + (float)n_recv / n_thread * 0.01;
 
         start = std::chrono::system_clock::now();
         inference(n_thread, recv_data, send_data);
@@ -162,7 +164,7 @@ void run_server(int n_thread, int pipe_fd, short int device_idx) {
 
         total_count += 1;
         if (total_count % 1000 == 0) {
-            printf("%d: occupancy_rate=%f, work_time=%f\n", total_count, occupancy_rate, work_time);
+            printf("%d: occupancy_rate=%.3f, work_time=%.3f\n", total_count, occupancy_rate, work_time);
         }
     }
 
@@ -178,7 +180,7 @@ void run_server(int n_thread, int pipe_fd, short int device_idx) {
 }  // namespace
 
 
-pid_t create_server_process(int n_thread, short int device_idx) {
+pid_t create_server_process(int n_thread, const char *model_fname, short int device_idx) {
     // initialize server address
     memset(&server_addr, 0, sizeof(struct sockaddr_un));
     server_addr.sun_family = AF_UNIX;
@@ -198,7 +200,7 @@ pid_t create_server_process(int n_thread, short int device_idx) {
         close(pipe_c2p[PIPE_WRITE]);
         exit(-1);
     } else if (pid == 0) {  // child process
-        run_server(n_thread, pipe_c2p[PIPE_WRITE], device_idx);
+        run_server(n_thread, pipe_c2p[PIPE_WRITE], model_fname, device_idx);
         printf("server exit\n");
         exit(0);
     }
@@ -235,6 +237,9 @@ int connect_to_server() {
 
 
 void request(int server_sock, const Board board, const Side side, const std::vector<bool>& legal_flags, std::vector<float>& priors, float& value) {
+    // thread_local int call_count = 0;
+    // thread_local float wait_time = 1.0;  // msec
+
     int retval;
     input_t send_data;
     send_data.black_board = board.get_black_board();
@@ -242,6 +247,7 @@ void request(int server_sock, const Board board, const Side side, const std::vec
     send_data.side = side;
     std::copy(legal_flags.begin(), legal_flags.end(), std::begin(send_data.legal_flags));
 
+    // auto start = std::chrono::system_clock::now();
     retval = write(server_sock, &send_data, sizeof(input_t));
     if (retval < 0){
         fprintf(stderr, "write error %s\n", strerror(errno));
@@ -255,6 +261,14 @@ void request(int server_sock, const Board board, const Side side, const std::vec
         exit(-1);
     }
     assert(retval > 0);
+
+    // auto end = std::chrono::system_clock::now();
+    // float elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() * 1e-3;
+    // wait_time = wait_time * 0.99 + elapsed * 0.01;
+    // if (call_count % 100000 == 0) {
+    //     printf("client wait_time=%f\n", wait_time);
+    // }
+    // call_count += 1;
 
     std::copy(std::begin(recv_data.priors), std::end(recv_data.priors), priors.begin());
     value = recv_data.value;

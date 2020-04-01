@@ -19,7 +19,7 @@ void p(GameNode* node) {
     std::cout << *node;
 }
 
-void random_dirichlet(std::default_random_engine &engine, const float alpha, std::vector<float> &output) {
+void random_dirichlet(std::default_random_engine& engine, const float alpha, std::vector<float> &output) {
     std::gamma_distribution<double> gamma(alpha, 1.0);
     double sum_g = 0;
     for (unsigned int i = 0; i < output.size(); i++) {

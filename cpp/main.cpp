@@ -16,7 +16,7 @@ void collect_mldata(int thread_id, int n_game, int n_simulation, const char *fna
     if (access(fname, F_OK) != -1) {
         fprintf(stderr, "ERROR: data file %s already exists\n", fname);
         close(server_sock);
-        exit(-1);
+        return;
     }
 
     std::random_device seed_gen;
@@ -61,8 +61,8 @@ void collect_mldata(int thread_id, int n_game, int n_simulation, const char *fna
 
 
 int main(int argc, char *argv[]) {
-    if (argc != 5) {
-        printf("Usage: main [generation] [n_thread] [n_game] [n_simulation]\n");
+    if (argc < 5) {
+        printf("Usage: main [generation] [n_thread] [n_game] [n_simulation] ([device_idx])\n");
         exit(-1);
     }
     int generation = atoi(argv[1]);
@@ -70,14 +70,17 @@ int main(int argc, char *argv[]) {
     int n_game = atoi(argv[3]);
     int n_simulation = atoi(argv[4]);
     int n_game_thread = (n_game + n_thread - 1) / n_thread;
+    short int device_id = 0;
+    if (argc == 6) {
+        device_id = atoi(argv[5]);
+    }
 
     char root_path[100];
     get_root_path(argv[0], root_path);
     char model_fname[100];
     sprintf(model_fname, "%s/model/model_jit_%d.pt", root_path, generation);
 
-    short int device_idx = 0;
-    pid_t server_pid = create_server_process(n_thread, model_fname, device_idx);
+    pid_t server_pid = create_server_process(n_thread, model_fname, device_id);
     (void)server_pid;
     // printf("server_pid=%d\n", server_pid);
 

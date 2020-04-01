@@ -25,12 +25,12 @@ def flip_side(side):
 
 
 def read_until(proc, phrase):
+    # print(f"read_until {phrase}")
     contents = ""
     while True:
         line = proc.stdout.readline()
-        # print(f"read_until : \"{line}\"")
+        # print(f"read_until received: \"{line}\"")
         if len(line) == 0:
-            # print("read_until: disconnected")
             break
 
         contents += line
@@ -78,6 +78,7 @@ def play_game(args):
     side = "b"
     time_stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = open(f"log_{time_stamp}.txt", "w")
+    count = 0
 
     while True:
         if side == side1:  # com of proc1 is in turn
@@ -94,7 +95,7 @@ def play_game(args):
 
         if m_action:
             action = m_action.group(1)
-            print(f"side={side}, action=\"{action}\"")
+            print(f"{count}: side={side} action=\"{action}\"")
             log_file.write(action + "\n")
         else:
             # action not received => 2 cases
@@ -138,6 +139,7 @@ def play_game(args):
         # print(f"send action \"{action}\"")
 
         side = flip_side(side)
+        count += 1
 
     proc1.wait()
     proc2.wait()
@@ -151,3 +153,5 @@ if __name__ == '__main__':
     parser.add_argument("cmd1", type=str, help="command for the first program")
     parser.add_argument("cmd2", type=str, help="command for the second program")
     args = parser.parse_args()
+
+    play_game(args)

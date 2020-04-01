@@ -40,6 +40,13 @@ int main(int argc, char const *argv[])
             << " action=" << entry.action
             << " Q=" << entry.Q
             << " result=" << entry.result << std::endl;
+        float sum = 0;
+        for (float posterior : entry.posteriors) {
+            std::cout << posterior << " ";
+            sum += posterior;
+        }
+        std::cout << "\nsum=" << sum << std::endl;
+
         i++;
         if (i == limit) {
             break;

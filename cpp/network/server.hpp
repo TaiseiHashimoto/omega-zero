@@ -23,7 +23,7 @@ typedef struct {
 } output_t;
 
 
-pid_t create_server_process(int n_thread, const char *model_fname, short int device_idx);
+pid_t create_server_process(int n_thread, const char *model_fname, short int device_id);
 
 int connect_to_server();
 

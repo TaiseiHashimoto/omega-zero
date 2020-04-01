@@ -56,11 +56,9 @@ int connect_to_clients(int n_thread, int pipe_fd, std::vector<int>& client_socks
     return listen_sock;
 }
 
-void run_server(int n_thread, int pipe_fd, const char *model_fname, short int device_idx) {
+void run_server(int n_thread, int pipe_fd, const char *model_fname, short int device_id) {
     printf("server start\n");
-    int pid = getpid();
-
-    init_model(model_fname, device_idx);
+    init_model(model_fname, device_id);
 
     std::vector<int> client_socks(n_thread);
     int listen_sock = connect_to_clients(n_thread, pipe_fd, client_socks);
@@ -182,7 +180,7 @@ void run_server(int n_thread, int pipe_fd, const char *model_fname, short int de
 }  // namespace
 
 
-pid_t create_server_process(int n_thread, const char *model_fname, short int device_idx) {
+pid_t create_server_process(int n_thread, const char *model_fname, short int device_id) {
     // define socket file name
     sprintf(socket_path, "/tmp/server_%d.sock", getpid());
     unlink(socket_path);  // remove old socket file
@@ -205,7 +203,7 @@ pid_t create_server_process(int n_thread, const char *model_fname, short int dev
         close(pipe_c2p[PIPE_WRITE]);
         exit(-1);
     } else if (pid == 0) {  // child process
-        run_server(n_thread, pipe_c2p[PIPE_WRITE], model_fname, device_idx);
+        run_server(n_thread, pipe_c2p[PIPE_WRITE], model_fname, device_id);
         printf("server exit\n");
         exit(0);
     }

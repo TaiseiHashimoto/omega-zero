@@ -12,3 +12,4 @@ sftp-config.json
 __pycache__/
 record*.txt
 log*.txt
+*.lprof

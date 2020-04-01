@@ -84,9 +84,9 @@ namespace {
     OmegaNet omega_net{nullptr};
 }
 
-void init_model(const char *model_fname, short int device_idx) {
+void init_model(const char *model_fname, short int device_id) {
     if (torch::cuda::is_available()) {
-        device = {torch::kCUDA, device_idx};
+        device = {torch::kCUDA, device_id};
     }
     std::cout << "using " << device << std::endl;
 

@@ -13,13 +13,17 @@
 
 
 int main(int argc, char *argv[]) {
-    if (argc != 4) {
-        fprintf(stderr, "Usage: play [generation] [n_simulation] [record_fname]\n");
+    if (argc < 4) {
+        fprintf(stderr, "Usage: play [generation] [n_simulation] [record_fname] ([device_id])\n");
         exit(-1);
     }
     int generation = atoi(argv[1]);
     int n_simulation = atoi(argv[2]);
     const char *record_fname = argv[3];
+    short int device_id = 0;
+    if (argc == 5) {
+        device_id = atoi(argv[4]);
+    }
 
     std::ofstream file(record_fname);
 
@@ -28,7 +32,7 @@ int main(int argc, char *argv[]) {
     char model_fname[100];
     sprintf(model_fname, "%s/model/model_jit_%d.pt", root_path, generation);
 
-    pid_t server_pid = create_server_process(/*n_thread=*/1, model_fname, /*device_idx=*/0);
+    pid_t server_pid = create_server_process(/*n_thread=*/1, model_fname, device_id);
     (void)server_pid;
     int server_sock = connect_to_server();  // NN server
 
@@ -68,7 +72,7 @@ int main(int argc, char *argv[]) {
         std::cout << "side : " << side << "\n";
 
         if (side == comp_side) {
-            current_node = run_mcts(current_node, n_simulation, server_sock, engine);
+            current_node = run_mcts(current_node, n_simulation, server_sock, engine, /*stochastic=*/false);
             history.push_back(current_node);
             action = current_node->parent()->action();
             std::cout << "@ action : " << action << "\n";

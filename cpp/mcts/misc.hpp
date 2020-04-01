@@ -22,7 +22,7 @@ void safe_delete(T*& p) {
     p = nullptr;
 }
 
-void random_dirichlet(std::default_random_engine &engine, const float alpha, std::vector<float> &output);
+void random_dirichlet(std::default_random_engine& engine, const float alpha, std::vector<float> &output);
 
 Action parse_action(std::string input);
 

@@ -183,7 +183,7 @@ GameNode* GameNode::select_child() const {
 }
 
 // return next node, set m_action and m_posteriors
-GameNode* GameNode::next_node(std::default_random_engine &engine) {
+GameNode* GameNode::next_node(std::default_random_engine& engine, bool stochastic) {
     if (m_pass) {
         assert(m_children.size() == 1);
         m_action = SpetialAction::PASS;
@@ -192,41 +192,58 @@ GameNode* GameNode::next_node(std::default_random_engine &engine) {
 
     std::vector<float> ratios;
     float ratio_sum = 0;
-    for (const auto& child : m_children) {
-        int count = child->N();
+    float ratio_max = 0;
+    unsigned int ratio_max_idx = 64;
+    for (unsigned int i = 0; i < m_children.size(); i++) {
+        int count = m_children[i]->N();
         float ratio = static_cast<float>(count);  // tau not used because tau = 1
         ratios.push_back(ratio);
         ratio_sum += ratio;
+        if (ratio > ratio_max) {
+            ratio_max = ratio;
+            ratio_max_idx = i;
+        }
     }
-
-    unsigned int selected=64;  // TODO: delete initialization
-    unsigned int n_children = m_children.size();
 
     assert(ratio_sum >= 1.0);
 
-    // select child according to visited count (ratio)
-    std::uniform_real_distribution<float> uniform(0., ratio_sum);
-    float rnd = uniform(engine);
-    for (unsigned int i = 0; i < n_children; i++) {
-        if (rnd <= ratios[i]) {
-            selected = i;
-            break;
+    unsigned int selected=64;  // TODO: delete initialization
+
+    if (stochastic) {
+        // select child according to visited count (ratio)
+        std::uniform_real_distribution<float> uniform(0., ratio_sum);
+        float rnd = uniform(engine);
+        for (unsigned int i = 0; i < m_children.size(); i++) {
+            if (rnd <= ratios[i]) {
+                selected = i;
+                break;
+            }
+            rnd -= ratios[i];
         }
-        rnd -= ratios[i];
+        // calculate posterior
+        for (unsigned int i = 0; i < m_children.size(); i++) {
+            Action action = m_legal_actions[i];
+            m_posteriors[action] = ratios[i] / ratio_sum;
+        }
+    } else {
+        selected = ratio_max_idx;
+        Action action = m_legal_actions[selected];
+        m_posteriors[action] = 1.0;
     }
+
     assert(selected < m_children.size());
     m_action = m_legal_actions[selected];
 
-    // calculate posterior
-    for (unsigned int i = 0; i < n_children; i++) {
-        Action action = m_legal_actions[i];
-        m_posteriors[action] = ratios[i] / ratio_sum;
-    }
+    // float sum = std::accumulate(m_posteriors.begin(), m_posteriors.end(), 0.);
+    // if (!(sum > 0.99 && sum < 1.01)) {
+    //     printf("sum = %f\n", sum);
+    // }
+    // assert(sum > 0.99 && sum < 1.01);
 
     return m_children[selected];
 }
 
-void GameNode::add_exploration_noise(std::default_random_engine &engine) {
+void GameNode::add_exploration_noise(std::default_random_engine& engine) {
     int n = m_children.size();
     std::vector<float> noise(n);
     if (DIRICHLET_ALPHA == 0) {

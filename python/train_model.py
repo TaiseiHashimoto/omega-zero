@@ -5,7 +5,7 @@ import argparse
 import pathlib
 
 from model import OmegaNet
-from mldata import DataLoader
+from mldata import MyDataset
 
 
 def get_window_size(generation, max_size=20, ratio=0.8):
@@ -38,6 +38,7 @@ def train(args):
 
     root_path = pathlib.Path(__file__).resolve().parents[1]
     old_model_path = root_path / 'model' / f'model_{args.generation}.pt'
+    old_model_jit_path = root_path / 'model' / f'model_jit_{args.generation}.pt'
     new_model_path = root_path / 'model' / f'model_{args.generation+1}.pt'
     new_model_jit_path = root_path / 'model' / f'model_jit_{args.generation+1}.pt'
 
@@ -58,31 +59,55 @@ def train(args):
     omega_net.load_state_dict(torch.load(old_model_path))
     print(f"load {old_model_path}")
 
+    if args.generation % 5 != 0:  # delete old model
+        print(f"unlink {old_model_path}, {old_model_jit_path}")
+        old_model_path.unlink()
+        old_model_jit_path.unlink()
+
     omega_net.to(device)
     optim = torch.optim.AdamW(omega_net.parameters())
 
     file_names = get_file_names(root_path, args.generation)
-    loader = DataLoader(file_names, args.batch_size, args.n_iter, device)
+    # loader = DataLoader()
+    dataset = MyDataset(file_names)
+    loader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.n_worker)
 
-    total_len = len(loader)
     count = 0
-    for black_board_b, white_board_b, side_b, legal_flags_b, result_b, Q_b, posteriors_b in loader:
-        policy_logit_b, value_pred_b = omega_net(black_board_b, white_board_b, side_b, legal_flags_b)
+    epoch = 0
+    while count < args.n_iter:
+        print(f"epoch {epoch}")
+        epoch += 1
+        for black_board_b, white_board_b, side_b, legal_flags_b, result_b, Q_b, posteriors_b in loader:
+            black_board_b = black_board_b.to(device)
+            white_board_b = white_board_b.to(device)
+            side_b = side_b.to(device)
+            legal_flags_b = legal_flags_b.to(device)
+            result_b = result_b.to(device)
+            Q_b = Q_b.to(device)
+            posteriors_b = posteriors_b.to(device)
 
-        policy_loss = -(posteriors_b * policy_logit_b).sum(dim=1).mean(dim=0)
+            policy_logit_b, value_pred_b = omega_net(black_board_b, white_board_b, side_b, legal_flags_b)
 
-        value_target_b = (result_b + Q_b) / 2  # TODO: how to create target
-        value_loss = (value_pred_b - value_target_b).pow(2).mean(dim=0)
+            policy_loss = -(posteriors_b * policy_logit_b).sum(dim=1).mean(dim=0)
 
-        loss = policy_loss + value_loss
-        optim.zero_grad()
-        loss.backward()
-        optim.step()
+            # value_target_b = (result_b + Q_b) / 2  # TODO: how to create target
+            value_target_b = result_b  # TODO: how to create target
+            value_loss = (value_pred_b - value_target_b).pow(2).mean(dim=0)
 
-        count += 1
-        if count % 500 == 0:
-            entropy = -(posteriors_b * (posteriors_b + 1e-45).log()).sum(dim=1).mean(dim=0).item()
-            print(f"{count:6d}/{total_len:6d}  policy_loss={policy_loss:.4f} (entropy={entropy:.3f}) value_loss={value_loss:.4f}")
+            loss = policy_loss + value_loss
+            optim.zero_grad()
+            loss.backward()
+            optim.step()
+
+            count += 1
+            if count % 500 == 0:
+                entropy = -(posteriors_b * (posteriors_b + 1e-45).log()).sum(dim=1).mean(dim=0).item()
+                uniform = legal_flags_b / (legal_flags_b.sum(dim=1, keepdim=True) + 1e-8)
+                entropy_uni = -(uniform * (uniform + 1e-45).log()).sum(dim=1).mean(dim=0).item()
+                print(f"{count:6d}/{args.n_iter:5d}  policy_loss={policy_loss:.4f} (entropy={entropy:.3f}, entropy_uni={entropy_uni:.3f}) value_loss={value_loss:.4f}")
+
+            if count == args.n_iter:
+                break
 
     omega_net.cpu()
 
@@ -104,10 +129,10 @@ if __name__ == '__main__':
     # generation >= 0
     # train (generation+1)-th model using data from (generation)-th model
     parser.add_argument('generation', type=int)
-    parser.add_argument('-d', '--device_id', type=int, default=0)
+    parser.add_argument('--device-id', type=int, default=0)
     parser.add_argument('--batch-size', type=int, default=512)
-    # n_iter approximately corresponds to # epochs
-    parser.add_argument('--n-iter', type=int, default=20000)
+    parser.add_argument('--n-iter', type=int, default=10000)
+    parser.add_argument('--n-worker', type=int, default=0)
     args = parser.parse_args()
 
     print(args)

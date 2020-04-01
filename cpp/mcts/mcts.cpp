@@ -21,7 +21,8 @@ void play_game(int n_simulation, int server_sock, std::vector<GameNode*>& histor
 
     for (int move_count = 0;; move_count++) {
         // printf("move_count = %d\n", move_count+1);
-        current_node = run_mcts(current_node, n_simulation, server_sock, engine);
+        bool stochastic = move_count < N_SAMPLING_MOVES;
+        current_node = run_mcts(current_node, n_simulation, server_sock, engine, stochastic);
         // p(current_node);
         history.push_back(current_node);  // terminal node included
         if (current_node->terminal()) {
@@ -30,7 +31,7 @@ void play_game(int n_simulation, int server_sock, std::vector<GameNode*>& histor
     }
 }
 
-GameNode *run_mcts(GameNode *current_node, int n_simulation, int server_sock, std::default_random_engine& engine) {
+GameNode *run_mcts(GameNode *current_node, int n_simulation, int server_sock, std::default_random_engine& engine, bool stochastic) {
     current_node->add_exploration_noise(engine);
 
     for (int sim_count = 0; sim_count < n_simulation; sim_count++) {
@@ -51,7 +52,7 @@ GameNode *run_mcts(GameNode *current_node, int n_simulation, int server_sock, st
         // p();
     }
 
-    GameNode* next_node = current_node->next_node(engine);
+    GameNode* next_node = current_node->next_node(engine, stochastic);
     // printf("selected ( ");
     // for (unsigned int i = 0; i < current_node->legal_actions().size(); i++) {
     //     auto action = current_node->legal_actions()[i];

@@ -41,8 +41,8 @@ public:
     void add_children(const std::vector<float>& priors);
     GameNode* select_child() const;
     void backpropagete(float value, GameNode* stop_node);
-    GameNode* next_node(std::default_random_engine &engine);
-    void add_exploration_noise(std::default_random_engine &engine);
+    GameNode* next_node(std::default_random_engine& engine, bool stochastic);
+    void add_exploration_noise(std::default_random_engine& engine);
     void set_prior(const float prior);
 
 private:

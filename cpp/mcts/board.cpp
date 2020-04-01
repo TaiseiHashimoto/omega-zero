@@ -71,11 +71,11 @@ BitBoard transfer(const BitBoard pos, int dir) {
 std::ostream& operator<<(std::ostream& os, Action action)
 {
     if (action == SpetialAction::PASS) {
-        os << "Pass";
+        os << "pass";
     } else if (action == SpetialAction::BACK) {
-        os << "BACK";
+        os << "back";
     } else if (action == SpetialAction::INVALID) {
-        os << "INVALID";
+        os << "invalid";
     } else if (action < 64) {
         os << static_cast<char>('a' + action % 8) << static_cast<char>('1' + action / 8);
     } else {
@@ -335,8 +335,7 @@ void Board::set_boards(BitBoard player_board, BitBoard opponent_board, Side side
 }
 
 
-std::ostream& operator<<(std::ostream& os, const Board& board)
-{
+std::ostream& operator<<(std::ostream& os, const Board& board) {
     os << "  a b c d e f g h";
     for (int y = 0; y < Board::HEIGHT; ++y) {
         os << '\n' << (y + 1);

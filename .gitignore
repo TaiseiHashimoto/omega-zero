@@ -1,6 +1,5 @@
 build*/
 test*
-record.txt
 *.out
 *.dat
 .ipynb_checkpoints/
@@ -11,3 +10,5 @@ model/*
 *.pt
 sftp-config.json
 __pycache__/
+record*.txt
+log*.txt

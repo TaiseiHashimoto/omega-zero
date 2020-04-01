@@ -69,6 +69,7 @@ int main(int argc, char *argv[]) {
     int n_thread = atoi(argv[2]);
     int n_game = atoi(argv[3]);
     int n_simulation = atoi(argv[4]);
+    int n_game_thread = (n_game + n_thread - 1) / n_thread;
 
     char root_path[100];
     get_root_path(argv[0], root_path);
@@ -77,6 +78,7 @@ int main(int argc, char *argv[]) {
 
     short int device_idx = 0;
     pid_t server_pid = create_server_process(n_thread, model_fname, device_idx);
+    (void)server_pid;
     // printf("server_pid=%d\n", server_pid);
 
     std::vector<std::thread> client_threads(n_thread);
@@ -84,9 +86,9 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < n_thread; i++) {
         fnames[i] = new char[100];
-        sprintf(fnames[i], "%s/mldata/%d_%d.dat", root_path, generation, i); // TODO: abs path
+        sprintf(fnames[i], "%s/mldata/%d_%d.dat", root_path, generation, i);
         printf("start creating %s\n", fnames[i]);
-        client_threads[i] = std::thread(collect_mldata, i, n_game, n_simulation, fnames[i]);
+        client_threads[i] = std::thread(collect_mldata, i, n_game_thread, n_simulation, fnames[i]);
     }
     for (int i = 0; i < n_thread; i++) {
         client_threads[i].join();

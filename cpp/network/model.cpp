@@ -86,7 +86,6 @@ namespace {
 
 void init_model(const char *model_fname, short int device_idx) {
     if (torch::cuda::is_available()) {
-        // TODO: cpu fastter?
         device = {torch::kCUDA, device_idx};
     }
     std::cout << "using " << device << std::endl;

@@ -33,11 +33,12 @@ void random_dirichlet(std::default_random_engine &engine, const float alpha, std
 }
 
 Action parse_action(std::string input) {
-    if (input.size() == 1) {
-        if (input[0] == 'b') {
+    if (input.size() == 4) {
+        if (input == "pass") {
+            return SpetialAction::PASS;
+        } else if (input == "back") {
             return SpetialAction::BACK;
         }
-        return SpetialAction::INVALID;
     } else if (input.size() == 2) {
         int col = input[0] - 'a';
         int row = input[1] - '1';

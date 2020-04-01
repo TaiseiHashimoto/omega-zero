@@ -34,7 +34,7 @@ class DataLoader:
 
         self.total_entry = sum(self.n_entries)
         self.iter_count = 0
-        self.max_count = self.total_entry * n_iter // batch_size
+        # self.max_count = self.total_entry * n_iter // batch_size
 
         for file_name, n_entry in zip(file_names, self.n_entries):
             print(f"{file_name} : {n_entry}")
@@ -44,10 +44,12 @@ class DataLoader:
         return self
     
     def __len__(self):
-        return self.max_count
+        # return self.max_count
+        return self.n_iter
 
     def __next__(self):
-        if self.iter_count == self.max_count:
+        # if self.iter_count == self.max_count:
+        if self.iter_count == self.n_iter:
             for file in self.files:
                 file.close()
             raise StopIteration()

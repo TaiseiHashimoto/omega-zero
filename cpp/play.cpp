@@ -33,8 +33,8 @@ int main(int argc, char *argv[]) {
     int server_sock = connect_to_server();  // NN server
 
     std::string input;
-    std::cout << "valid actions : position (e.g. a1) / back (b)\n";
-    std::cout << "[b]lack / [w]hite ? ";
+    std::cout << "valid actions : position (e.g. a1) / back / pass\n";
+    std::cout << "@ [b]lack / [w]hite ?\n";
     std::cin >> input;
 
     Side player_side;
@@ -60,18 +60,21 @@ int main(int argc, char *argv[]) {
     root->backpropagete(root->value(), root);
 
     GameNode* current_node = root;
-    std::cout << current_node->board() << "\n";
+    std::cout << "\n" << current_node->board() << "\n";
     history.push_back(current_node);
 
     Action action;
     for (int move_count = 0;; move_count++) {
+        std::cout << "side : " << side << "\n";
+
         if (side == comp_side) {
             current_node = run_mcts(current_node, n_simulation, server_sock, engine);
             history.push_back(current_node);
             action = current_node->parent()->action();
+            std::cout << "@ action : " << action << "\n";
         } else {
             while (true) {
-                std::cout << "action ? ";
+                std::cout << "@ action ?\n";
                 std::cin >> input;
                 action = parse_action(input);
                 if (!current_node->board().is_legal_action(action, side)) {
@@ -81,7 +84,9 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-            if (action == SpetialAction::BACK) {
+            if (action == SpetialAction::PASS) {
+                current_node = current_node->children()[0];
+            } else if (action == SpetialAction::BACK) {
                 current_node = current_node->parent()->parent();
                 // re-create children
                 for (auto& child : current_node->children()) {
@@ -93,6 +98,8 @@ int main(int argc, char *argv[]) {
                 float value;  // not used
                 request(server_sock, current_node->board(), current_node->side(), current_node->legal_flags(), priors, value);
                 current_node->add_children(priors);
+                // do not flip side in this case
+                side = flip_side(side);
             } else {
                 unsigned int selected = 64;
                 auto& legal_actions = current_node->legal_actions();
@@ -104,16 +111,15 @@ int main(int argc, char *argv[]) {
                 }
                 assert(selected < legal_actions.size());
                 current_node = current_node->children()[selected];
-                if (!current_node->expanded()) {
-                    current_node->expand(server_sock);
-                    current_node->backpropagete(current_node->value(), current_node);
-                }
+            }
+
+            if (!current_node->expanded()) {
+                current_node->expand(server_sock);
+                current_node->backpropagete(current_node->value(), current_node);
             }
         }
 
-        std::cout << side << " : " << action << "\n\n";
-        // std::cout << current_node->board() << "\n";
-        std::cout << *current_node << "\n";
+        std::cout << "\n" << *current_node << "\n";
         file << action << "\n";
         file.flush();
         if (current_node->terminal()) {
@@ -125,7 +131,8 @@ int main(int argc, char *argv[]) {
     int count_b = current_node->board().count(CellState::BLACK);
     int count_w = current_node->board().count(CellState::WHITE);
     float result = current_node->board().get_result(player_side);
-    std::cout << "black:" << count_b << " white:" << count_w << " result:" << result << "\n";
+    printf("@ result : black=%d white=%d\n", count_b, count_w);
+    printf("result=%f\n", result);
 
     file.close();
 

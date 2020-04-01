@@ -18,12 +18,13 @@ def get_file_names(root_path, generation, delete_old=True):
 
     file_names = []
     for i in range(generation - window_size + 1, generation + 1):
-        for path in root_path.glob(f"mldata/{i}_*.dat"):
-            file_names.append(str(path))
+        path = root_path / pathlib.Path(f"mldata/{i}.dat")
+        file_names.append(str(path))
 
     if delete_old:
         for i in range(generation - window_size + 1):
-            for path in root_path.glob(f"mldata/{i}_*.dat"):
+            path = root_path / pathlib.Path(f"mldata/{i}.dat")
+            if path.exists():
                 print(f"unlink {path}")
                 path.unlink()
 
@@ -104,9 +105,9 @@ if __name__ == '__main__':
     # train (generation+1)-th model using data from (generation)-th model
     parser.add_argument('generation', type=int)
     parser.add_argument('-d', '--device_id', type=int, default=0)
-    parser.add_argument('--batch-size', type=int, default=256)
+    parser.add_argument('--batch-size', type=int, default=512)
     # n_iter approximately corresponds to # epochs
-    parser.add_argument('--n-iter', type=int, default=20)
+    parser.add_argument('--n-iter', type=int, default=20000)
     args = parser.parse_args()
 
     print(args)

@@ -6,7 +6,6 @@
 #include "board.hpp"
 
 
-#define UNIXDOMAIN_PATH "/tmp/reversi_server.sock"
 #define TIMEOUT_USEC 500
 #define MAX_TIMEOUT 4
 

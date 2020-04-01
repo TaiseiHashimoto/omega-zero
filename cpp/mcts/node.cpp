@@ -199,7 +199,7 @@ GameNode* GameNode::next_node(std::default_random_engine &engine) {
         ratio_sum += ratio;
     }
 
-    unsigned int selected=1000;  // TODO: delete initialization
+    unsigned int selected=64;  // TODO: delete initialization
     unsigned int n_children = m_children.size();
 
     assert(ratio_sum >= 1.0);
@@ -214,7 +214,7 @@ GameNode* GameNode::next_node(std::default_random_engine &engine) {
         }
         rnd -= ratios[i];
     }
-    assert(selected < ratios.size());
+    assert(selected < m_children.size());
     m_action = m_legal_actions[selected];
 
     // calculate posterior
@@ -223,18 +223,12 @@ GameNode* GameNode::next_node(std::default_random_engine &engine) {
         m_posteriors[action] = ratios[i] / ratio_sum;
     }
 
-    // TODO: delete this
-    for (auto post : m_posteriors) {
-        assert(post >= 0 && post <= 1);
-    }
-
     return m_children[selected];
 }
 
 void GameNode::add_exploration_noise(std::default_random_engine &engine) {
     int n = m_children.size();
     std::vector<float> noise(n);
-    // TODO: delete case 0
     if (DIRICHLET_ALPHA == 0) {
         std::fill(noise.begin(), noise.end(), 0);
     } else {
@@ -254,6 +248,7 @@ void GameNode::set_prior(const float prior) {
 
 std::ostream& operator<<(std::ostream& os, const GameNode& node) {
     os << node.board();
+    os << node.side() << "\n";
     if (node.expanded()) {
         if (node.legal_actions().size() > 0) {
             for (const auto& action : node.legal_actions()) {
@@ -262,11 +257,10 @@ std::ostream& operator<<(std::ostream& os, const GameNode& node) {
         } else {
             os << "Pass ";
         }
-        os << node.side() << "\n";
     } else {
         os << "not expanded  ";
     }
-    os << "N=" << node.N() << " Q=" << node.Q() << " v=" << node.value() << " t=" << node.terminal() << "\n";
+    os << "\nN=" << node.N() << " Q=" << node.Q() << " v=" << node.value() << " t=" << node.terminal() << "\n";
     return os;
 }
 

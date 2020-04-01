@@ -23,6 +23,7 @@
 namespace {
 
 struct sockaddr_un server_addr;
+char socket_path[100];
 
 int connect_to_clients(int n_thread, int pipe_fd, std::vector<int>& client_socks) {
     int listen_sock = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -57,7 +58,8 @@ int connect_to_clients(int n_thread, int pipe_fd, std::vector<int>& client_socks
 
 void run_server(int n_thread, int pipe_fd, const char *model_fname, short int device_idx) {
     printf("server start\n");
-    unlink(UNIXDOMAIN_PATH);  // remove file
+    int pid = getpid();
+
     init_model(model_fname, device_idx);
 
     std::vector<int> client_socks(n_thread);
@@ -181,10 +183,13 @@ void run_server(int n_thread, int pipe_fd, const char *model_fname, short int de
 
 
 pid_t create_server_process(int n_thread, const char *model_fname, short int device_idx) {
-    // initialize server address
+    // define socket file name
+    sprintf(socket_path, "/tmp/server_%d.sock", getpid());
+    unlink(socket_path);  // remove old socket file
+    // set server address
     memset(&server_addr, 0, sizeof(struct sockaddr_un));
     server_addr.sun_family = AF_UNIX;
-    strcpy(server_addr.sun_path, UNIXDOMAIN_PATH);
+    strcpy(server_addr.sun_path, socket_path);
 
     // create pipe to receive sign of preparation completion
     int pipe_c2p[2];

@@ -41,13 +41,7 @@ def read_until(proc, phrase):
     return contents
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("cmd1", type=str, help="command for the first program")
-    parser.add_argument("cmd2", type=str, help="command for the second program")
-    parser.add_argument("-n", "--num-games", type=int, default=1)
-    args = parser.parse_args()
-
+def play_game(args):
     print("side ([b]lack / [w]hite) of the first program ? ", end="")
     side = input()
     if side == "b":
@@ -70,9 +64,9 @@ if __name__ == '__main__':
 
     # read until side prompt
     contents = read_until(proc1, side_prompt)
-    print(f"proc1 contents = \"{contents}\"")
+    # print(f"proc1 contents = \"{contents}\"")
     contents = read_until(proc2, side_prompt)
-    print(f"proc2 contents = \"{contents}\"")
+    # print(f"proc2 contents = \"{contents}\"")
 
     # send *player* side (not computer side!)
     proc1.stdin.write(side2 + "\n")
@@ -82,7 +76,6 @@ if __name__ == '__main__':
 
     # start game
     side = "b"
-    history = []
     time_stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = open(f"log_{time_stamp}.txt", "w")
 
@@ -102,7 +95,6 @@ if __name__ == '__main__':
         if m_action:
             action = m_action.group(1)
             print(f"side={side}, action=\"{action}\"")
-            history.append(action)
             log_file.write(action + "\n")
         else:
             # action not received => 2 cases
@@ -143,13 +135,19 @@ if __name__ == '__main__':
         # print(f"not in turn contents = \"{contents}\"")
         proc_recv.stdin.write(action + "\n")
         proc_recv.stdin.flush()
-        print(f"send action \"{action}\"")
+        # print(f"send action \"{action}\"")
 
         side = flip_side(side)
-    
+
     proc1.wait()
     proc2.wait()
 
-    # print(history)
     log_file.close()
-    print("finish!")
+    # print("finish!")
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("cmd1", type=str, help="command for the first program")
+    parser.add_argument("cmd2", type=str, help="command for the second program")
+    args = parser.parse_args()

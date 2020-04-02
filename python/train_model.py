@@ -59,11 +59,6 @@ def train(args):
     omega_net.load_state_dict(torch.load(old_model_path))
     print(f"load {old_model_path}")
 
-    if args.generation % 5 != 0:  # delete old model
-        print(f"unlink {old_model_path}, {old_model_jit_path}")
-        old_model_path.unlink()
-        old_model_jit_path.unlink()
-
     omega_net.to(device)
     optim = torch.optim.AdamW(omega_net.parameters())
 
@@ -122,6 +117,11 @@ def train(args):
     omega_net_traced.save(str(new_model_jit_path))
 
     print(f"model saved! ({new_model_path}, {new_model_jit_path})")
+
+    if args.generation % 5 != 0:  # delete old model
+        print(f"unlink {old_model_path}, {old_model_jit_path}")
+        old_model_path.unlink()
+        old_model_jit_path.unlink()
 
 
 if __name__ == '__main__':

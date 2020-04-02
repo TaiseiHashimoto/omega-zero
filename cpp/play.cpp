@@ -4,26 +4,53 @@
 #include <random>
 #include <cstdlib>
 #include <cassert>
+#include <cstring>
 #include <unistd.h>
+#include <getopt.h>
 
 #include "node.hpp"
+#include <iostream>
+#include <unistd.h>
+
 #include "mcts.hpp"
 #include "server.hpp"
 #include "misc.hpp"
 
-
 int main(int argc, char *argv[]) {
-    if (argc < 4) {
-        fprintf(stderr, "Usage: play [generation] [n_simulation] [record_fname] ([device_id])\n");
+    if (argc < 2) {
+        fprintf(stderr, "Usage: play generation [n_simulation] [record_fname] [device_id]\n");
         exit(-1);
     }
     int generation = atoi(argv[1]);
-    int n_simulation = atoi(argv[2]);
-    const char *record_fname = argv[3];
-    short int device_id = 0;
-    if (argc == 5) {
-        device_id = atoi(argv[4]);
+    printf("generation = %d\n", generation);
+
+    int n_simulation = 400;
+    char record_fname[100] = "record.txt";
+    int device_id = 0;
+
+    int opt, longindex;
+    const struct option longopts[] = {
+        {"n_simulation", required_argument, NULL, 's'},
+        {"record_fname", required_argument, NULL, 'r'},
+        {"device_id", required_argument, NULL, 'd'},
+        {0, 0, 0, 0}
+    };
+    while ((opt = getopt_long(argc, argv, "s:r:d:", longopts, &longindex)) != -1) {
+        switch (opt) {
+            case 's':
+                n_simulation = atoi(optarg);
+                break;
+            case 'r':
+                strcpy(record_fname, optarg);
+                break;
+            case 'd': {
+                device_id = atoi(optarg);
+            }
+        }
     }
+    printf("n_simulation = %d\n", n_simulation);
+    printf("record_fname = %s\n", record_fname);
+    printf("device_id = %d\n\n", device_id);
 
     std::ofstream file(record_fname);
 

@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < n_thread; i++) {
         fnames[i] = new char[100];
         sprintf(fnames[i], "%s/mldata/%d_%d.dat", root_path, generation, i);
-        printf("start creating %s\n", fnames[i]);
+        // printf("start creating %s\n", fnames[i]);
         client_threads[i] = std::thread(collect_mldata, i, n_game_thread, n_simulation, fnames[i]);
     }
     for (int i = 0; i < n_thread; i++) {

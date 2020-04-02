@@ -16,13 +16,15 @@ if __name__ == '__main__':
         n_game = 10
         n_simulation = 1
         n_iter = 1
+        end_generation = 10
     else:
         n_thread = 50
         n_game = 2500
         n_simulation = 100
         n_iter = 10000
+        end_generation = 100
 
-    start = datetime.datetime.now()
+    start_time = datetime.datetime.now()
 
     model_dir_path = pathlib.Path('model')
     if model_dir_path.exists():
@@ -40,14 +42,15 @@ if __name__ == '__main__':
             generations.append(int(file_path.name[:-4]))
         print(f"generations = {generations}")
         if len(generations) > 0:
-            current = max(generations)
+            start_generation = max(generations)
     else:
         mldata_dir_path.mkdir()
-        current = 0
+        start_generation = 0
 
-    print(f"\ncurrent generation = {current}")
 
-    for generation in range(current, 100):
+    for generation in range(start_generation, end_generation):
+        print(f"generation = {generation}")
+
         mldata_path = mldata_dir_path / f'{generation}.dat'
         if mldata_path.exists():
             print(f"\n{mldata_path} already exists")
@@ -71,5 +74,7 @@ if __name__ == '__main__':
             print("\n" + model_train_cmd)
             subprocess.check_call(model_train_cmd.split())
 
-        end = datetime.datetime.now()
-        print(f"\nelapsed time: {end - start}\n")
+        delta1 = datetime.datetime.now() - start_time
+        remaining_sec = delta1.total_seconds() * (end_generation-generation-1) / (generation-start_generation+1)
+        delta2 = datetime.timedelta(seconds=remaining_sec)
+        print(f"\nelapsed time: {delta1}  reamaining time: {delta2}\n")

@@ -4,6 +4,7 @@ add_library(network STATIC
     model.cpp
     server.cpp
     "${PROJECT_SOURCE_DIR}/mcts/board.hpp"
+    "${PROJECT_SOURCE_DIR}/config/config.hpp"
 )
 
-target_link_libraries(network Threads::Threads ${TORCH_LIBRARIES})
+target_link_libraries(network Threads::Threads ${TORCH_LIBRARIES} config)

@@ -28,4 +28,4 @@ Action parse_action(std::string input);
 
 int bit_count(uint64_t x);
 
-void get_root_path(const char *program_name, char *output);
+void get_exp_path(const char *prog_name, int exp_id, char *output);

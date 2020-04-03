@@ -10,7 +10,7 @@
 int main(int argc, char const *argv[])
 {
     if (argc != 3) {
-        fprintf(stderr, "Usage: read_mldata [file] [limit]\n");
+        fprintf(stderr, "Usage: read_mldata file limit\n");
         exit(-1);
     }
 

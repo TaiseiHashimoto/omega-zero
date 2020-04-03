@@ -4,6 +4,7 @@
 
 #include "model.hpp"
 #include "server.hpp"
+#include "config.hpp"
 
 
 // /**
@@ -84,16 +85,18 @@ namespace {
     OmegaNet omega_net{nullptr};
 }
 
-void init_model(const char *model_fname, short int device_id) {
+void init_model() {
+    const auto& config = get_config();
+
     if (torch::cuda::is_available()) {
-        device = {torch::kCUDA, device_id};
+        device = {torch::kCUDA, (short int)config.device_id};
     }
     std::cout << "using " << device << std::endl;
 
-    omega_net = OmegaNet(BOARD_SIZE, N_ACTION, N_RES_BLOCK, RES_FILTER, HEAD_FILTER, VALUE_HIDDEN);
+    omega_net = OmegaNet(config.board_size, config.n_action, config.n_res_block, config.res_filter, config.head_filter, config.value_hidden);
     try {
-        printf("load model %s\n", model_fname);
-        torch::load(omega_net, model_fname);
+        printf("load model %s\n", config.model_fname);
+        torch::load(omega_net, config.model_fname);
     } catch (const c10::Error& e) {
         fprintf(stderr, "error loading the model\n");
         exit(-1);
@@ -102,12 +105,14 @@ void init_model(const char *model_fname, short int device_id) {
     omega_net->eval();
 }
 
-void inference(int n_thread, const input_t *recv_data, output_t *send_data) {
-    float *black_board_arr = new float[n_thread * 64];  // TODO: ok?
-    float *white_board_arr = new float[n_thread * 64];
-    float *side_arr = new float[n_thread];
-    float *legal_flags_arr = new float[n_thread * 64];
-    for (int i = 0; i < n_thread; i++) {
+void inference(const input_t *recv_data, output_t *send_data) {
+    const auto& config = get_config();
+
+    float *black_board_arr = new float[config.n_thread * 64];  // TODO: ok?
+    float *white_board_arr = new float[config.n_thread * 64];
+    float *side_arr = new float[config.n_thread];
+    float *legal_flags_arr = new float[config.n_thread * 64];
+    for (int i = 0; i < config.n_thread; i++) {
         for (int j = 0; j < 64; j++) {
             black_board_arr[i*64+j] = static_cast<float>((recv_data[i].black_board >> j) & 1);
             white_board_arr[i*64+j] = static_cast<float>((recv_data[i].white_board >> j) & 1);
@@ -116,10 +121,10 @@ void inference(int n_thread, const input_t *recv_data, output_t *send_data) {
         side_arr[i] = static_cast<float>(recv_data[i].side);
     }
 
-    torch::Tensor black_board_b = torch::from_blob(black_board_arr, {n_thread, 8, 8}).to(device);
-    torch::Tensor white_board_b = torch::from_blob(white_board_arr, {n_thread, 8, 8}).to(device);
-    torch::Tensor side_b = torch::from_blob(side_arr, {n_thread}).to(device);
-    torch::Tensor legal_flags_b = torch::from_blob(legal_flags_arr, {n_thread, 64}).to(device);
+    torch::Tensor black_board_b = torch::from_blob(black_board_arr, {config.n_thread, 8, 8}).to(device);
+    torch::Tensor white_board_b = torch::from_blob(white_board_arr, {config.n_thread, 8, 8}).to(device);
+    torch::Tensor side_b = torch::from_blob(side_arr, {config.n_thread}).to(device);
+    torch::Tensor legal_flags_b = torch::from_blob(legal_flags_arr, {config.n_thread, 64}).to(device);
 
     torch::Tensor policy_b, value_pred_b;
     {
@@ -131,7 +136,7 @@ void inference(int n_thread, const input_t *recv_data, output_t *send_data) {
     value_pred_b = value_pred_b.to(torch::kCPU);
 
     float *value_pred_arr = (float*)value_pred_b.data_ptr();
-    for (int i = 0; i < n_thread; i++) {
+    for (int i = 0; i < config.n_thread; i++) {
         memcpy(send_data[i].priors, policy_b[i].data_ptr(), sizeof(float)*64);
         send_data[i].value = value_pred_arr[i];
     }

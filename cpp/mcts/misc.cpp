@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <cstring>
+#include <cstdlib>
 #include <algorithm>
 #include <unistd.h>
 #include <libgen.h>
@@ -67,11 +68,12 @@ int bit_count(uint64_t x) {
     return (int)x;
 }
 
-void get_root_path(const char *program_name, char *output) {
-    char *retval = realpath(program_name, output);
+void get_exp_path(const char *prog_name, int exp_id, char *output) {
+    // Assume that program is in ROOT/cpp/bin/
+    char *retval = realpath(prog_name, output);
     if (retval == NULL) {
         fprintf(stderr, "realpath error %s\n", strerror(errno));
     }
     char *root_path = dirname(dirname(dirname(output)));
-    strcpy(output, root_path);
+    sprintf(output, "%s/exp/%d", root_path, exp_id);
 }

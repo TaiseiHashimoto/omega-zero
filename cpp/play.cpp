@@ -9,57 +9,64 @@
 #include <getopt.h>
 
 #include "node.hpp"
-#include <iostream>
-#include <unistd.h>
-
 #include "mcts.hpp"
 #include "server.hpp"
 #include "misc.hpp"
+#include "config.hpp"
+
 
 int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        fprintf(stderr, "Usage: play generation [n_simulation] [record_fname] [device_id]\n");
+    if ((argc < 3) || (argc > 3 && argv[3][0] != '-')) {
+        fprintf(stderr, "Usage: play exp_id generation [--n_simulation=N] [--device_id=ID] [--record_fname=NAME]\n");
         exit(-1);
     }
-    int generation = atoi(argv[1]);
+    int exp_id = atoi(argv[1]);
+    int generation = atoi(argv[2]);
+    printf("exp_id = %d\n", exp_id);
     printf("generation = %d\n", generation);
 
+    char exp_path[100];
+    get_exp_path(argv[0], exp_id, exp_path);
+    printf("exp_path = %s\n", exp_path);
+
     int n_simulation = 400;
-    char record_fname[100] = "record.txt";
+    char record_fname[100] = "./record.txt";
     int device_id = 0;
 
     int opt, longindex;
     const struct option longopts[] = {
-        {"n_simulation", required_argument, NULL, 's'},
-        {"record_fname", required_argument, NULL, 'r'},
+        {"n_simulation", required_argument, NULL, 'n'},
         {"device_id", required_argument, NULL, 'd'},
+        {"record_fname", required_argument, NULL, 'r'},
         {0, 0, 0, 0}
     };
-    while ((opt = getopt_long(argc, argv, "s:r:d:", longopts, &longindex)) != -1) {
+    while ((opt = getopt_long(argc, argv, "n:d:r:", longopts, &longindex)) != -1) {
         switch (opt) {
-            case 's':
+            case 'n':
                 n_simulation = atoi(optarg);
+                break;
+            case 'd':
+                device_id = atoi(optarg);
                 break;
             case 'r':
                 strcpy(record_fname, optarg);
                 break;
-            case 'd': {
-                device_id = atoi(optarg);
-            }
+            default:
+                fprintf(stderr, "unknown option\n");
+                exit(-1);
         }
     }
     printf("n_simulation = %d\n", n_simulation);
-    printf("record_fname = %s\n", record_fname);
-    printf("device_id = %d\n\n", device_id);
+    printf("device_id = %d\n", device_id);
+    printf("record_fname = %s\n\n", record_fname);
+
+    init_config(exp_path, generation, device_id);
+    // overwrite experiment configuration
+    set_config(/*n_game=*/1, /*n_thread=*/1, n_simulation);
 
     std::ofstream file(record_fname);
 
-    char root_path[100];
-    get_root_path(argv[0], root_path);
-    char model_fname[100];
-    sprintf(model_fname, "%s/model/model_jit_%d.pt", root_path, generation);
-
-    pid_t server_pid = create_server_process(/*n_thread=*/1, model_fname, device_id);
+    pid_t server_pid = create_server_process();
     (void)server_pid;
     int server_sock = connect_to_server();  // NN server
 
@@ -90,7 +97,7 @@ int main(int argc, char *argv[]) {
     root->expand(server_sock);
     root->backpropagete(root->value(), root);
 
-    GameNode* current_node = root;
+    GameNode *current_node = root;
     std::cout << "\n" << current_node->board() << "\n";
     history.push_back(current_node);
 
@@ -99,7 +106,7 @@ int main(int argc, char *argv[]) {
         std::cout << "side : " << side << "\n";
 
         if (side == comp_side) {
-            current_node = run_mcts(current_node, n_simulation, server_sock, engine, /*stochastic=*/false);
+            current_node = run_mcts(current_node, /*tau=*/0., server_sock, engine);
             history.push_back(current_node);
             action = current_node->parent()->action();
             std::cout << "@ action : " << action << "\n";
@@ -120,15 +127,16 @@ int main(int argc, char *argv[]) {
             } else if (action == SpetialAction::BACK) {
                 current_node = current_node->parent()->parent();
                 // re-create children
-                for (auto& child : current_node->children()) {
+                for (auto& child : current_node->children_()) {
                     safe_delete(child);
                 }
-                current_node->children().clear();
+                current_node->children_().clear();
 
-                std::vector<float> priors(64);  // re-calculate priors
-                float value;  // not used
-                request(server_sock, current_node->board(), current_node->side(), current_node->legal_flags(), priors, value);
-                current_node->add_children(priors);
+                // std::vector<float> priors(64);  // re-calculate priors
+                // float value;  // not used
+                // request(server_sock, current_node->board(), current_node->side(), current_node->legal_flags(), priors, value);
+                // current_node->add_children(priors);
+                current_node->expand(server_sock);
                 // do not flip side in this case
                 side = flip_side(side);
             } else {

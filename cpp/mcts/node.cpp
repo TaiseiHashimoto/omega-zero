@@ -1,15 +1,18 @@
-#include <vector>
 #include <iostream>
+#include <vector>
 #include <cmath>
 #include <cassert>
 #include <random>
+#if USE_CACHE
 #include <mutex>
 #include <tuple>
+#endif
 
 #include "node.hpp"
 #include "mcts.hpp"
 #include "server.hpp"
 #include "misc.hpp"
+#include "config.hpp"
 
 
 #if USE_CACHE
@@ -80,7 +83,11 @@ Side GameNode::side() const {
     return m_side;
 }
 
-std::vector<GameNode*>& GameNode::children()  {
+const std::vector<GameNode*>& GameNode::children() const {
+    return m_children;
+}
+
+std::vector<GameNode*>& GameNode::children_() {
     return m_children;
 }
 
@@ -126,7 +133,7 @@ void GameNode::expand(int server_sock) {
         cache.add(m_board, m_side, priors, m_value);
     }
 #else
-    request(server_sock, m_board, m_side, m_legal_flags, priors, m_value);    
+    request(server_sock, m_board, m_side, m_legal_flags, priors, m_value);
 #endif
 
     add_children(priors);
@@ -161,6 +168,8 @@ void GameNode::backpropagete(float value, GameNode* stop_node) {
 }
 
 GameNode* GameNode::select_child() const {
+    const auto& config = get_config();
+
     float max_score = -1;  // -1 <= score
     GameNode* selected = nullptr;
     // printf("selecting...\n");
@@ -169,7 +178,7 @@ GameNode* GameNode::select_child() const {
         float value_score = -child->Q();  // flip opponent's value
         // TODO: log term necessary?
         float prior_score = child->prior() * std::sqrt(m_N) / (child->N() + 1);
-        float score = value_score + C_PUCT * prior_score;
+        float score = value_score + config.c_puct * prior_score;
         // std::cout << m_legal_actions[i] << ":(" << value_score << "," << prior_score << ") ";
         // i++;
         if (max_score < score) {
@@ -183,20 +192,22 @@ GameNode* GameNode::select_child() const {
 }
 
 // return next node, set m_action and m_posteriors
-GameNode* GameNode::next_node(std::default_random_engine& engine, bool stochastic) {
+GameNode* GameNode::next_node(float tau, std::default_random_engine& engine) {
     if (m_pass) {
         assert(m_children.size() == 1);
         m_action = SpetialAction::PASS;
         return m_children[0];
     }
 
+    bool stochastic = (tau > 0.01);
+    float tau_inv = stochastic ? 1.0 / tau : 1.0;
+
     std::vector<float> ratios;
     float ratio_sum = 0;
     float ratio_max = 0;
     unsigned int ratio_max_idx = 64;
     for (unsigned int i = 0; i < m_children.size(); i++) {
-        int count = m_children[i]->N();
-        float ratio = static_cast<float>(count);  // tau not used because tau = 1
+        float ratio = std::pow((float)m_children[i]->N(), tau_inv);
         ratios.push_back(ratio);
         ratio_sum += ratio;
         if (ratio > ratio_max) {
@@ -234,29 +245,28 @@ GameNode* GameNode::next_node(std::default_random_engine& engine, bool stochasti
     assert(selected < m_children.size());
     m_action = m_legal_actions[selected];
 
-    // float sum = std::accumulate(m_posteriors.begin(), m_posteriors.end(), 0.);
-    // if (!(sum > 0.99 && sum < 1.01)) {
-    //     printf("sum = %f\n", sum);
-    // }
-    // assert(sum > 0.99 && sum < 1.01);
-
     return m_children[selected];
 }
 
 void GameNode::add_exploration_noise(std::default_random_engine& engine) {
+    const auto& config = get_config();
+
     int n = m_children.size();
     std::vector<float> noise(n);
-    if (DIRICHLET_ALPHA == 0) {
+    if (config.d_alpha == 0) {
         std::fill(noise.begin(), noise.end(), 0);
     } else {
-        random_dirichlet(engine, DIRICHLET_ALPHA, noise);
+        random_dirichlet(engine, config.d_alpha, noise);
     }
 
+    // std::cout << "noise = [";
     for (int i = 0; i < n; i++) {
         float org_prior = m_children[i]->prior();
-        float new_prior =  org_prior * (1 - EXPLORATION_FRAC) + noise[i] * EXPLORATION_FRAC;
+        float new_prior =  org_prior * (1 - config.e_frac) + noise[i] * config.e_frac;
         m_children[i]->set_prior(new_prior);
+        // std::cout << noise[i] << " ";
     }
+    // std::cout << "]" << std::endl;
 }
 
 void GameNode::set_prior(const float prior) {
@@ -267,12 +277,17 @@ std::ostream& operator<<(std::ostream& os, const GameNode& node) {
     os << node.board();
     os << node.side() << "\n";
     if (node.expanded()) {
-        if (node.legal_actions().size() > 0) {
-            for (const auto& action : node.legal_actions()) {
-                os << action << " ";
+        unsigned int n_legal_actions = node.legal_actions().size();
+        if (n_legal_actions > 0) {
+            for (unsigned int i = 0; i < n_legal_actions; i++) {
+                Action action = node.legal_actions()[i];
+                // int N = node.children()[i]->N();
+                // os << action << "(" << N << ") ";
+                float prior = node.children()[i]->prior();
+                os << action << "(" << prior << ") ";
             }
         } else {
-            os << "Pass ";
+            os << "pass ";
         }
     } else {
         os << "not expanded  ";

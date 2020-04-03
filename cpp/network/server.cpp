@@ -14,6 +14,7 @@
 #include "server.hpp"
 #include "model.hpp"
 #include "board.hpp"
+#include "config.hpp"
 
 
 #define PIPE_READ  0
@@ -25,7 +26,9 @@ namespace {
 struct sockaddr_un server_addr;
 char socket_path[100];
 
-int connect_to_clients(int n_thread, int pipe_fd, std::vector<int>& client_socks) {
+int connect_to_clients(int pipe_fd, std::vector<int>& client_socks) {
+    const auto& config = get_config();
+
     int listen_sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (listen_sock < 0){
         fprintf(stderr, "socket error %s\n", strerror(errno));
@@ -46,7 +49,7 @@ int connect_to_clients(int n_thread, int pipe_fd, std::vector<int>& client_socks
         exit(-1);
     }
 
-    for (int i = 0; i < n_thread; i++) {
+    for (int i = 0; i < config.n_thread; i++) {
         client_socks[i] = accept(listen_sock, NULL, NULL);
         if(client_socks[i] < 0){
             fprintf(stderr, "accept error %s\n", strerror(errno));
@@ -56,36 +59,36 @@ int connect_to_clients(int n_thread, int pipe_fd, std::vector<int>& client_socks
     return listen_sock;
 }
 
-void run_server(int n_thread, int pipe_fd, const char *model_fname, short int device_id) {
-    printf("server start\n");
-    init_model(model_fname, device_id);
+void run_server(int pipe_fd) {
+    const auto& config = get_config();
 
-    std::vector<int> client_socks(n_thread);
-    int listen_sock = connect_to_clients(n_thread, pipe_fd, client_socks);
-    printf("accepted %d clients\n", n_thread);
+    printf("server start\n");
+    init_model();
+
+    std::vector<int> client_socks(config.n_thread);
+    int listen_sock = connect_to_clients(pipe_fd, client_socks);
+    printf("accepted %d clients\n", config.n_thread);
 
     // initialization for select()
     int maxfd = 0;
     fd_set fds_org;
     FD_ZERO(&fds_org);
-    for (int i = 0; i < n_thread; i++) {
+    for (int i = 0; i < config.n_thread; i++) {
         FD_SET(client_socks[i], &fds_org);
         maxfd = std::max(client_socks[i], maxfd);
     }
 
-    // static double total_time = 0;
-
     int retval;
     int n_disc = 0;
 
-    input_t *recv_data = new input_t[n_thread];
-    output_t *send_data = new output_t[n_thread];
+    input_t *recv_data = new input_t[config.n_thread];
+    output_t *send_data = new output_t[config.n_thread];
 
-    static int total_count = 0;  // total count of inference
-    std::chrono::system_clock::time_point start, end;
-    float elapsed;  // msec
-    float work_time = 1.0;  // msec
-    float occupancy_rate = 0.5;
+    // static int total_count = 0;  // total count of inference
+    // std::chrono::system_clock::time_point start, end;
+    // float elapsed;  // msec
+    // float work_time = 1.0;  // msec
+    // float occupancy_rate = 0.5;
 
     while (true) {  // loop until all clients disconnect
         std::vector<int> to_respond;
@@ -93,7 +96,7 @@ void run_server(int n_thread, int pipe_fd, const char *model_fname, short int de
         int timeout_count = 0;
 
         // receive data
-        while (n_recv + n_disc < n_thread && timeout_count < MAX_TIMEOUT) {
+        while (n_recv + n_disc < config.n_thread && timeout_count < MAX_TIMEOUT) {
             fd_set fds = fds_org;
             if (n_recv == 0) {    // no waiting client
                 retval = select(maxfd+1, &fds, NULL, NULL, NULL);
@@ -113,7 +116,7 @@ void run_server(int n_thread, int pipe_fd, const char *model_fname, short int de
                 continue;
             }
 
-            for (int i = 0; i < n_thread; i++) {
+            for (int i = 0; i < config.n_thread; i++) {
                 if (FD_ISSET(client_socks[i], &fds)) {
                     char buf[100];
                     memset(buf, 0, sizeof(buf));
@@ -140,14 +143,14 @@ void run_server(int n_thread, int pipe_fd, const char *model_fname, short int de
             // printf("timeout_count = %d, n_recv = %d\n", timeout_count, n_recv);
         }
 
-        if (n_disc == n_thread) {  // all clients disconnected
+        if (n_disc == config.n_thread) {  // all clients disconnected
             break;
         }
 
-        occupancy_rate = occupancy_rate * 0.99 + (float)n_recv / n_thread * 0.01;
+        // occupancy_rate = occupancy_rate * 0.99 + (float)n_recv / config.n_thread * 0.01;
 
-        start = std::chrono::system_clock::now();
-        inference(n_thread, recv_data, send_data);
+        // start = std::chrono::system_clock::now();
+        inference(recv_data, send_data);
 
         // send data
         for (int idx : to_respond) {
@@ -158,20 +161,20 @@ void run_server(int n_thread, int pipe_fd, const char *model_fname, short int de
             }
         }
 
-        end = std::chrono::system_clock::now();
-        elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() * 1e-3;
-        work_time = work_time * 0.99 + elapsed * 0.01;
+        // end = std::chrono::system_clock::now();
+        // elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() * 1e-3;
+        // work_time = work_time * 0.99 + elapsed * 0.01;
 
-        total_count += 1;
-        if (total_count % 1000 == 0) {
-            printf("%d: occupancy_rate=%.3f, work_time=%.3f\n", total_count, occupancy_rate, work_time);
-        }
+        // total_count += 1;
+        // if (total_count % 1000 == 0) {
+        //     printf("%d: occupancy_rate=%.3f, work_time=%.3f\n", total_count, occupancy_rate, work_time);
+        // }
     }
 
     delete[] recv_data;
     delete[] send_data;
 
-    for (int i = 0; i < n_thread; i++) {
+    for (int i = 0; i < config.n_thread; i++) {
         close(client_socks[i]);
     }
     close(listen_sock);
@@ -180,7 +183,7 @@ void run_server(int n_thread, int pipe_fd, const char *model_fname, short int de
 }  // namespace
 
 
-pid_t create_server_process(int n_thread, const char *model_fname, short int device_id) {
+pid_t create_server_process() {
     // define socket file name
     sprintf(socket_path, "/tmp/server_%d.sock", getpid());
     unlink(socket_path);  // remove old socket file
@@ -203,7 +206,7 @@ pid_t create_server_process(int n_thread, const char *model_fname, short int dev
         close(pipe_c2p[PIPE_WRITE]);
         exit(-1);
     } else if (pid == 0) {  // child process
-        run_server(n_thread, pipe_c2p[PIPE_WRITE], model_fname, device_id);
+        run_server(pipe_c2p[PIPE_WRITE]);
         printf("server exit\n");
         exit(0);
     }
@@ -239,7 +242,7 @@ int connect_to_server() {
 }
 
 
-void request(int server_sock, const Board board, const Side side, const std::vector<bool>& legal_flags, std::vector<float>& priors, float& value) {
+void request(int server_sock, const Board& board, const Side side, const std::vector<bool>& legal_flags, std::vector<float>& priors, float& value) {
     // thread_local int call_count = 0;
     // thread_local float wait_time = 1.0;  // msec
 

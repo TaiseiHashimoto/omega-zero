@@ -13,3 +13,4 @@ __pycache__/
 record*.txt
 log*.txt
 *.lprof
+exp/

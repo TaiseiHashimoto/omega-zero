@@ -4,14 +4,6 @@
 #include "server.hpp"
 
 
-#define BOARD_SIZE 8
-#define N_ACTION 64
-#define N_RES_BLOCK 5
-#define RES_FILTER 64
-#define HEAD_FILTER 32
-#define VALUE_HIDDEN 64
-
-
 struct ResBlockImpl : torch::nn::Module {
     ResBlockImpl(int n_filter);
 
@@ -36,5 +28,5 @@ struct OmegaNetImpl : torch::nn::Module {
 
 TORCH_MODULE(OmegaNet);
 
-void init_model(const char *model_fname, short int device_id);
-void inference(int n_thread, const input_t *recv_data, output_t *send_data);
+void init_model();
+void inference(const input_t *recv_data, output_t *send_data);

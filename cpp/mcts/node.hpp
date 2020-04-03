@@ -24,7 +24,8 @@ public:
     const Board& board() const;
     Side side() const;
     GameNode* parent() const;
-    std::vector<GameNode*>& children();
+    const std::vector<GameNode*>& children() const;
+    std::vector<GameNode*>& children_();
     int N() const;
     float Q() const;
     float prior() const;
@@ -41,7 +42,7 @@ public:
     void add_children(const std::vector<float>& priors);
     GameNode* select_child() const;
     void backpropagete(float value, GameNode* stop_node);
-    GameNode* next_node(std::default_random_engine& engine, bool stochastic);
+    GameNode* next_node(float tau, std::default_random_engine& engine);
     void add_exploration_noise(std::default_random_engine& engine);
     void set_prior(const float prior);
 

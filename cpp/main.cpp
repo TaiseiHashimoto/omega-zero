@@ -2,15 +2,18 @@
 #include <thread>
 #include <vector>
 #include <cstdlib>
+#include <cstring>
 #include <unistd.h>
+#include <getopt.h>
 
 #include "mcts.hpp"
 #include "mldata.hpp"
 #include "server.hpp"
 #include "misc.hpp"
+#include "config.hpp"
 
 
-void collect_mldata(int thread_id, int n_game, int n_simulation, const char *fname) {
+void collect_mldata(int thread_id, int n_game, const char *fname) {
     int server_sock = connect_to_server();  // NN server
 
     if (access(fname, F_OK) != -1) {
@@ -26,7 +29,7 @@ void collect_mldata(int thread_id, int n_game, int n_simulation, const char *fna
 
     for (int i = 0; i < n_game; i++) {
         std::vector<GameNode*> history;
-        play_game(n_simulation, server_sock, history, engine);
+        play_game(history, server_sock, engine);
 
         // printf("\n### history ###\n");
         // for (unsigned int i = 0; i < history.size(); i++) {
@@ -40,7 +43,7 @@ void collect_mldata(int thread_id, int n_game, int n_simulation, const char *fna
         save_game(history, result, fname);
         safe_delete(history[0]);  // delete root -> whole tree
 
-        if (i % 5 == 0) {
+        if (i % 10 == 0) {
             auto end = std::chrono::system_clock::now();
             int elapsed = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
             float remaining = (float)(elapsed) / (i + 1) * (n_game - i - 1) / 60;
@@ -61,39 +64,56 @@ void collect_mldata(int thread_id, int n_game, int n_simulation, const char *fna
 
 
 int main(int argc, char *argv[]) {
-    if (argc < 5) {
-        printf("Usage: main [generation] [n_thread] [n_game] [n_simulation] ([device_idx])\n");
+    if ((argc < 3) || (argc > 3 && argv[3][0] != '-')) {
+        printf("Usage: main exp_id generation [--device_id=ID]\n");
         exit(-1);
     }
-    int generation = atoi(argv[1]);
-    int n_thread = atoi(argv[2]);
-    int n_game = atoi(argv[3]);
-    int n_simulation = atoi(argv[4]);
-    int n_game_thread = (n_game + n_thread - 1) / n_thread;
-    short int device_id = 0;
-    if (argc == 6) {
-        device_id = atoi(argv[5]);
+    int exp_id = atoi(argv[1]);
+    int generation = atoi(argv[2]);
+    printf("exp_id = %d\n", exp_id);
+    printf("generation = %d\n", generation);
+
+    char exp_path[100];
+    get_exp_path(argv[0], exp_id, exp_path);
+    printf("exp_path = %s\n", exp_path);
+
+    int device_id = 0;
+
+    int opt, longindex;
+    const struct option longopts[] = {
+        {"device_id", required_argument, NULL, 'd'},
+        {0, 0, 0, 0}
+    };
+    while ((opt = getopt_long(argc, argv, "d:", longopts, &longindex)) != -1) {
+        switch (opt) {
+            case 'd':
+                device_id = atoi(optarg);
+                break;
+            default:
+                fprintf(stderr, "unknown option\n");
+                exit(-1);
+        }
     }
+    printf("device_id = %d\n\n", device_id);
 
-    char root_path[100];
-    get_root_path(argv[0], root_path);
-    char model_fname[100];
-    sprintf(model_fname, "%s/model/model_jit_%d.pt", root_path, generation);
+    init_config(exp_path, generation, device_id);
 
-    pid_t server_pid = create_server_process(n_thread, model_fname, device_id);
+    const auto& config = get_config();
+    int n_game_each = (config.n_game + config.n_thread - 1) / config.n_thread;
+
+    pid_t server_pid = create_server_process();
     (void)server_pid;
-    // printf("server_pid=%d\n", server_pid);
 
-    std::vector<std::thread> client_threads(n_thread);
-    std::vector<char*> fnames(n_thread);
+    std::vector<std::thread> client_threads(config.n_thread);
+    std::vector<char*> fnames(config.n_thread);
 
-    for (int i = 0; i < n_thread; i++) {
+    for (int i = 0; i < config.n_thread; i++) {
         fnames[i] = new char[100];
-        sprintf(fnames[i], "%s/mldata/%d_%d.dat", root_path, generation, i);
+        sprintf(fnames[i], "%s/mldata/%d_%d.dat", exp_path, generation, i);
         // printf("start creating %s\n", fnames[i]);
-        client_threads[i] = std::thread(collect_mldata, i, n_game_thread, n_simulation, fnames[i]);
+        client_threads[i] = std::thread(collect_mldata, i, n_game_each, fnames[i]);
     }
-    for (int i = 0; i < n_thread; i++) {
+    for (int i = 0; i < config.n_thread; i++) {
         client_threads[i].join();
         delete[] fnames[i];
     }

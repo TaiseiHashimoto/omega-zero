@@ -23,8 +23,7 @@ typedef struct {
 } output_t;
 
 
-pid_t create_server_process(int n_thread, const char *model_fname, short int device_id);
-
+pid_t create_server_process();
 int connect_to_server();
 
-void request(int server_sock, const Board board, const Side side, const std::vector<bool>& legal_flags, std::vector<float>& priors, float& value);
+void request(int server_sock, const Board& board, const Side side, const std::vector<bool>& legal_flags, std::vector<float>& priors, float& value);

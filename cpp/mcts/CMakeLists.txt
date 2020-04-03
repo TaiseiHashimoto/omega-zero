@@ -7,4 +7,5 @@ add_library(mcts STATIC
     mldata.cpp
     misc.cpp
     "${PROJECT_SOURCE_DIR}/network/server.hpp"
+    "${PROJECT_SOURCE_DIR}/config/config.hpp"
 )

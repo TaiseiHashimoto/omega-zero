@@ -38,7 +38,7 @@ int connect_to_clients(int pipe_fd, std::vector<int>& client_socks) {
         fprintf(stderr, "bind error %s\n", strerror(errno));
         exit(-1);
     }
-    if(listen(listen_sock, 5) < 0){
+    if(listen(listen_sock, 128) < 0){
         fprintf(stderr, "listen error %s\n", strerror(errno));
         exit(-1);
     }
@@ -88,7 +88,7 @@ void run_server(int pipe_fd) {
     // std::chrono::system_clock::time_point start, end;
     // float elapsed;  // msec
     // float work_time = 1.0;  // msec
-    // float occupancy_rate = 0.5;
+    // float occupancy_rate;
 
     while (true) {  // loop until all clients disconnect
         std::vector<int> to_respond;
@@ -147,7 +147,7 @@ void run_server(int pipe_fd) {
             break;
         }
 
-        // occupancy_rate = occupancy_rate * 0.99 + (float)n_recv / config.n_thread * 0.01;
+        // total_count += 1;
 
         // start = std::chrono::system_clock::now();
         inference(recv_data, send_data);
@@ -161,13 +161,13 @@ void run_server(int pipe_fd) {
             }
         }
 
-        // end = std::chrono::system_clock::now();
-        // elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() * 1e-3;
-        // work_time = work_time * 0.99 + elapsed * 0.01;
-
-        // total_count += 1;
         // if (total_count % 1000 == 0) {
-        //     printf("%d: occupancy_rate=%.3f, work_time=%.3f\n", total_count, occupancy_rate, work_time);
+            // end = std::chrono::system_clock::now();
+            // elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() * 1e-3;
+            // occupancy_rate = (float)n_recv / config.n_thread;
+            // printf("%d: occupancy_rate=%.3f\n", total_count, occupancy_rate);
+            // work_time = work_time * 0.99 + elapsed * 0.01;
+            // printf("work_time=%.3f\n", work_time)
         // }
     }
 

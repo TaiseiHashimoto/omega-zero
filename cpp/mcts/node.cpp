@@ -3,23 +3,14 @@
 #include <cmath>
 #include <cassert>
 #include <random>
-#if USE_CACHE
-#include <mutex>
-#include <tuple>
-#endif
+#include <numeric>
+#include <algorithm>
 
 #include "node.hpp"
 #include "mcts.hpp"
 #include "server.hpp"
 #include "misc.hpp"
 #include "config.hpp"
-
-
-#if USE_CACHE
-namespace {
-    Cache cache(CACHE_SIZE);
-}
-#endif
 
 
 GameNode::GameNode(Board board, Side side, float prior, GameNode* parent) {
@@ -124,17 +115,7 @@ void GameNode::expand(int server_sock) {
     }
 
     std::vector<float> priors(64);  // softmax-ed priors;
-#if USE_CACHE
-    bool exist = cache.get(m_board, m_side, priors, m_value);
-    if (!exist) {
-        // send request to server and receive response
-        // input: m_board, m_side, m_legal_flags / output: priors, m_value
-        request(server_sock, m_board, m_side, m_legal_flags, priors, m_value);
-        cache.add(m_board, m_side, priors, m_value);
-    }
-#else
     request(server_sock, m_board, m_side, m_legal_flags, priors, m_value);
-#endif
 
     add_children(priors);
 }
@@ -158,10 +139,8 @@ void GameNode::add_children(const std::vector<float>& priors) {
 void GameNode::backpropagete(float value, GameNode* stop_node) {
     m_Q = (m_Q * m_N + value) / (m_N + 1);
     m_N += 1;
-
     // p("backpropagete");
     // p(this);
-
     if (this != stop_node) {
         m_parent->backpropagete(-value, stop_node);  // flip value for opponent
     }
@@ -181,7 +160,7 @@ GameNode* GameNode::select_child() const {
         float score = value_score + config.c_puct * prior_score;
         // std::cout << m_legal_actions[i] << ":(" << value_score << "," << prior_score << ") ";
         // i++;
-        if (max_score < score) {
+        if (max_score <= score) {
             max_score = score;
             selected = child;
         }
@@ -275,16 +254,19 @@ void GameNode::set_prior(const float prior) {
 
 std::ostream& operator<<(std::ostream& os, const GameNode& node) {
     os << node.board();
-    os << node.side() << "\n";
+    os << node.side() << std::endl;
     if (node.expanded()) {
         unsigned int n_legal_actions = node.legal_actions().size();
         if (n_legal_actions > 0) {
-            for (unsigned int i = 0; i < n_legal_actions; i++) {
-                Action action = node.legal_actions()[i];
-                // int N = node.children()[i]->N();
-                // os << action << "(" << N << ") ";
-                float prior = node.children()[i]->prior();
-                os << action << "(" << prior << ") ";
+            std::vector<int> idxs(n_legal_actions);
+            const auto& children = node.children();
+            std::iota(idxs.begin(), idxs.end(), 0);
+            std::sort(idxs.begin(), idxs.end(),
+                [&children](int idx1, int idx2) {
+                    return children[idx1]->prior() > children[idx2]->prior();
+                });
+            for (int idx : idxs) {
+                os << node.legal_actions()[idx] << "(" << children[idx]->prior() << ") ";
             }
         } else {
             os << "pass ";
@@ -292,104 +274,10 @@ std::ostream& operator<<(std::ostream& os, const GameNode& node) {
     } else {
         os << "not expanded  ";
     }
-    os << "\nN=" << node.N() << " Q=" << node.Q() << " v=" << node.value() << " t=" << node.terminal() << "\n";
+    os << "\nN=" << node.N() << " Q=" << node.Q() << " v=" << node.value() << " t=" << node.terminal() << std::endl;
+
+    int count_b = node.board().count(CellState::BLACK);
+    int count_w = node.board().count(CellState::WHITE);
+    os << "disk: " << "black=" << count_b << " white=" << count_w << std::endl;
     return os;
 }
-
-
-#if USE_CACHE
-
-Cache::Cache(unsigned int max_size) {
-    m_size = max_size;
-    m_access_count = 0;
-    m_hit_count = 0;
-}
-
-bool Cache::get(const Board& board, Side side, std::vector<float>&priors, float& value) {
-    std::lock_guard<std::mutex> lock(m_mtx);
-
-    m_access_count += 1;  // TODO: overflow
-    CacheKey key = {board, side};
-
-    auto k_iter = m_keys.find(key);  // iterator of key
-    if (k_iter == m_keys.end()) {  // not exist
-        return false;
-    }
-
-    m_hit_count += 1;
-    auto v_iter = k_iter->second;  // iterator of value
-    // move element to front
-    m_values.splice(m_values.begin(), m_values, v_iter);
-
-    priors = v_iter->second.priors;
-    value = v_iter->second.value;
-
-    return true;
-}
-
-void Cache::add(const Board& board, Side side, const std::vector<float>& priors, float value) {
-    std::lock_guard<std::mutex> lock(m_mtx);
-
-    CacheKey new_key = {board, side};
-    CacheValue new_value = {priors, value};
-
-    auto k_iter = m_keys.find(new_key);  // iterator of key
-    if (k_iter != m_keys.end()) {
-        // same requests emitted concurrently
-        return;
-    }
-
-    m_values.push_front(std::make_pair(new_key, new_value));
-    m_keys[new_key] = m_values.begin();
-
-    if (m_values.size() > m_size) {  // delete element according to LRU
-        auto v_iter = std::prev(m_values.end());
-        m_keys.erase(v_iter->first);
-        m_values.pop_back();
-    }
-}
-
-std::tuple<int, int, int> Cache::stats() {
-    std::lock_guard<std::mutex> lock(m_mtx);
-    assert(m_values.size() == m_keys.size());
-    return std::make_tuple(m_keys.size(), m_access_count, m_hit_count);
-}
-
-std::tuple<int, int, int> get_cache_stats() {
-    return cache.stats();
-}
-
-bool CacheKey::operator<(const CacheKey& other) const {
-    if (board.get_black_board() < other.board.get_black_board()) {
-        return true;
-    } else if (board.get_black_board() > other.board.get_black_board()) {
-        return false;
-    }
-    if (board.get_white_board() < other.board.get_white_board()) {
-        return true;
-    } else if (board.get_white_board() > other.board.get_white_board()) {
-        return false;
-    }
-    if (side < other.side) {
-        return true;
-    } else if (side > other.side) {
-        return false;
-    }
-    return false;
-}
-
-std::ostream& operator<<(std::ostream& os, const CacheKey& key) {
-    os << key.board << "side=" << key.side;
-    return os;
-}
-
-std::ostream& operator<<(std::ostream& os, const CacheValue& val) {
-    os << "priors=[";
-    for (auto item : val.priors) {
-        os << item << " ";
-    }
-    os << "] value=" << val.value;
-    return os;
-}
-
-#endif

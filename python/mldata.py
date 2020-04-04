@@ -16,9 +16,10 @@ class Entry(ctypes.Structure):
     ]
 
 
-class MyDataset(torch.utils.data.Dataset):
-    def __init__(self, file_names):
+class DataLoader():
+    def __init__(self, file_names, batch_size):
         self.file_names = file_names
+        self.batch_size = batch_size
         self.entry_size = ctypes.sizeof(Entry)
         self.pos_binary = np.array([1 << i for i in range(64)], dtype=np.uint64)
 
@@ -42,6 +43,11 @@ class MyDataset(torch.utils.data.Dataset):
                     legal_flags_all.append(np.ctypeslib.as_array(entry.legal_flags).copy())
                     result_all.append(entry.result)
                     Q_all.append(entry.Q)
+                    # TODO: how to set policy target? (tau=0)
+                    # posteriors = np.ctypeslib.as_array(entry.posteriors)
+                    # posteriors_st = np.ctypeslib.as_array(entry.posteriors)
+                    # posteriors = np.zeros_like(posteriors_st)
+                    # posteriors[posteriors_st.argmax()] = 1.0
                     posteriors_all.append(np.ctypeslib.as_array(entry.posteriors).copy())
 
                 n_entries.append(file.tell() // self.entry_size)
@@ -66,16 +72,27 @@ class MyDataset(torch.utils.data.Dataset):
             print(f"{file_name} : {n_entry}")
         print(f"total : {self.total_entry}")
 
-    def __len__(self):
-        return self.total_entry
+        self.position = 0
+        self.perm = torch.randperm(self.total_entry)
 
-    def __getitem__(self, idx):
-        black_board_b = self.black_board_all[idx]
-        white_board_b = self.white_board_all[idx]
-        side_b = self.side_all[idx]
-        legal_flags_b = self.legal_flags_all[idx]
-        result_b = self.result_all[idx]
-        Q_b = self.Q_all[idx]
-        posteriors_b = self.posteriors_all[idx]
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.position >= self.total_entry:
+            self.position = 0
+            self.perm = torch.randperm(self.total_entry)
+            raise StopIteration()
+
+        idxs = self.perm[self.position:self.position+self.batch_size]
+        self.position += self.batch_size
+
+        black_board_b = self.black_board_all[idxs]
+        white_board_b = self.white_board_all[idxs]
+        side_b = self.side_all[idxs]
+        legal_flags_b = self.legal_flags_all[idxs]
+        result_b = self.result_all[idxs]
+        Q_b = self.Q_all[idxs]
+        posteriors_b = self.posteriors_all[idxs]
 
         return black_board_b, white_board_b, side_b, legal_flags_b, result_b, Q_b, posteriors_b

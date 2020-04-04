@@ -43,7 +43,7 @@ void collect_mldata(int thread_id, int n_game, const char *fname) {
         save_game(history, result, fname);
         safe_delete(history[0]);  // delete root -> whole tree
 
-        if (i % 10 == 0) {
+        if (i % 10 == 0 && thread_id % 10 == 0) {
             auto end = std::chrono::system_clock::now();
             int elapsed = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
             float remaining = (float)(elapsed) / (i + 1) * (n_game - i - 1) / 60;
@@ -65,17 +65,17 @@ void collect_mldata(int thread_id, int n_game, const char *fname) {
 
 int main(int argc, char *argv[]) {
     if ((argc < 3) || (argc > 3 && argv[3][0] != '-')) {
-        printf("Usage: main exp_id generation [--device_id=ID]\n");
+        std::cerr << "Usage: main exp_id generation [--device_id=ID]" << std::endl;
         exit(-1);
     }
     int exp_id = atoi(argv[1]);
     int generation = atoi(argv[2]);
-    printf("exp_id = %d\n", exp_id);
-    printf("generation = %d\n", generation);
+    std::cout << "exp_id = " << exp_id << std::endl;
+    std::cout << "generation = " << generation << std::endl;
 
     char exp_path[100];
     get_exp_path(argv[0], exp_id, exp_path);
-    printf("exp_path = %s\n", exp_path);
+    std::cout << "exp_path = " << exp_path << std::endl;
 
     int device_id = 0;
 
@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
                 exit(-1);
         }
     }
-    printf("device_id = %d\n\n", device_id);
+    std::cout << "device_id = " << device_id << std::endl;
 
     init_config(exp_path, generation, device_id);
 

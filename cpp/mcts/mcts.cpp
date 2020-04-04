@@ -24,6 +24,7 @@ void play_game(std::vector<GameNode*>& history, int server_sock, std::default_ra
 
     for (int move_count = 0;; move_count++) {
         // printf("move_count = %d\n", move_count+1);
+        // TODO: tau scheduling
         current_node = run_mcts(current_node, config.tau, server_sock, engine);
         // p(current_node);
         history.push_back(current_node);  // terminal node included

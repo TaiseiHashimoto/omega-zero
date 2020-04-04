@@ -10,9 +10,6 @@
 #include "board.hpp"
 
 
-#define USE_CACHE 0
-
-
 class GameNode
 {
 public:
@@ -64,39 +61,3 @@ private:
 };
 
 std::ostream& operator<<(std::ostream& os, const GameNode& node);
-
-
-#if USE_CACHE
-
-struct CacheKey {
-    Board board;
-    Side side;
-    bool operator<(const CacheKey& other) const;
-};
-
-struct CacheValue {
-    std::vector<float> priors;
-    float value;
-};
-
-class Cache {
-public:
-    Cache(unsigned int max_size);
-    bool get(const Board& board, Side side, std::vector<float>&priors, float& value);
-    void add(const Board& node, Side side, const std::vector<float>& priors, float value);
-    std::tuple<int, int, int> stats();
-
-private:
-    unsigned int m_size;
-    std::mutex m_mtx;
-    std::map<CacheKey, std::list<std::pair<CacheKey, CacheValue>>::iterator> m_keys;
-    // key is neccesary to delete item
-    std::list<std::pair<CacheKey, CacheValue>> m_values;  // front is newest
-
-    unsigned int m_access_count;
-    unsigned int m_hit_count;
-};
-
-std::tuple<int, int, int> get_cache_stats();
-
-#endif

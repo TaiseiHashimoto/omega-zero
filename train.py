@@ -65,7 +65,8 @@ if __name__ == '__main__':
         if model_path.exists():
             print(f"\n{model_path} already exists")
         else:
-            model_train_cmd = f"python python/train_model.py {args.exp_id} {generation} --device-id {args.device_id}"
+            Q_frac = generation / end_generation
+            model_train_cmd = f"python python/train_model.py {args.exp_id} {generation} --device-id {args.device_id} --Q-frac {Q_frac}"
             print("\n" + model_train_cmd)
             subprocess.check_call(model_train_cmd.split())
 

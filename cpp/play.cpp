@@ -22,12 +22,12 @@ int main(int argc, char *argv[]) {
     }
     int exp_id = atoi(argv[1]);
     int generation = atoi(argv[2]);
-    printf("exp_id = %d\n", exp_id);
-    printf("generation = %d\n", generation);
+    std::cout << "exp_id = " << exp_id << std::endl;
+    std::cout << "generation = " << generation << std::endl;
 
     char exp_path[100];
     get_exp_path(argv[0], exp_id, exp_path);
-    printf("exp_path = %s\n", exp_path);
+    std::cout << "exp_path = " << exp_path << std::endl;
 
     int n_simulation = 400;
     char record_fname[100] = "./record.txt";
@@ -56,9 +56,9 @@ int main(int argc, char *argv[]) {
                 exit(-1);
         }
     }
-    printf("n_simulation = %d\n", n_simulation);
-    printf("device_id = %d\n", device_id);
-    printf("record_fname = %s\n\n", record_fname);
+    std::cout << "n_simulation = " << n_simulation << std::endl;
+    std::cout << "device_id = " << device_id << std::endl;
+    std::cout << "record_fname = " << record_fname << std::endl;
 
     init_config(exp_path, generation, device_id);
     // overwrite experiment configuration
@@ -71,8 +71,8 @@ int main(int argc, char *argv[]) {
     int server_sock = connect_to_server();  // NN server
 
     std::string input;
-    std::cout << "valid actions : position (e.g. a1) / back / pass\n";
-    std::cout << "@ [b]lack / [w]hite ?\n";
+    std::cout << "valid actions : position (e.g. a1) / back / pass" << std::endl;
+    std::cout << "@ [b]lack / [w]hite ?" << std::endl;
     std::cin >> input;
 
     Side player_side;
@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
     } else if (input == "w") {
         player_side = Side::WHITE;
     } else {
-        std::cerr << "invalid input " << input << "\n";
+        std::cerr << "invalid input " << input << std::endl;
         exit(-1);
     }
     comp_side = flip_side(player_side);
@@ -98,12 +98,12 @@ int main(int argc, char *argv[]) {
     root->backpropagete(root->value(), root);
 
     GameNode *current_node = root;
-    std::cout << "\n" << current_node->board() << "\n";
+    std::cout << "\n" << current_node->board() << std::endl;
     history.push_back(current_node);
 
     Action action;
     for (int move_count = 0;; move_count++) {
-        std::cout << "side : " << side << "\n";
+        std::cout << "side : " << side << std::endl;
 
         if (side == comp_side) {
             current_node = run_mcts(current_node, /*tau=*/0., server_sock, engine);
@@ -169,9 +169,9 @@ int main(int argc, char *argv[]) {
 
     int count_b = current_node->board().count(CellState::BLACK);
     int count_w = current_node->board().count(CellState::WHITE);
-    float result = current_node->board().get_result(player_side);
-    printf("@ result : black=%d white=%d\n", count_b, count_w);
-    printf("result=%f\n", result);
+    float mlresult = current_node->board().get_result(player_side);
+    std::cout << "@ result : black=" << count_b << " white=" << count_w << std::endl;
+    std::cout << "mlresult=" << mlresult << std::endl;
 
     file.close();
 

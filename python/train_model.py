@@ -4,12 +4,13 @@ import numpy as np
 import argparse
 import pathlib
 import json
+import time
 
 from model import OmegaNet
-from mldata import MyDataset
+from mldata import DataLoader
 
 
-def get_window_size(generation, max_size=20, ratio=0.8):
+def get_window_size(generation, max_size=20, ratio=0.6):
     return min(int(np.ceil((generation+1) * ratio)), max_size)
 
 
@@ -61,7 +62,7 @@ def train(args):
         value_hidden=values["value_hidden"]
     )
 
-    n_update = values["n_update"]
+    epoch = values["epoch"]
     batch_size = values["batch_size"]
 
     # load latest model
@@ -72,15 +73,13 @@ def train(args):
     optim = torch.optim.AdamW(omega_net.parameters())
 
     file_names = get_file_names(exp_path, args.generation)
-    # loader = DataLoader()
-    dataset = MyDataset(file_names)
-    loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    start = time.time()
+    loader = DataLoader(file_names, batch_size)
+    elapsed = time.time() - start
+    print(f"load time : {elapsed:.2f} sec")
 
-    count = 0
-    epoch = 0
-    while count < n_update:
-        print(f"epoch {epoch}")
-        epoch += 1
+    start = time.time()
+    for e in range(epoch):
         for black_board_b, white_board_b, side_b, legal_flags_b, result_b, Q_b, posteriors_b in loader:
             black_board_b = black_board_b.to(device)
             white_board_b = white_board_b.to(device)
@@ -94,8 +93,7 @@ def train(args):
 
             policy_loss = -(posteriors_b * policy_logit_b).sum(dim=1).mean(dim=0)
 
-            # value_target_b = result_b
-            value_target_b = (result_b + Q_b) / 2  # TODO: how to create target?
+            value_target_b = result_b * (1 - args.Q_frac) + Q_b * args.Q_frac
             value_loss = (value_pred_b - value_target_b).pow(2).mean(dim=0)
 
             loss = policy_loss + value_loss
@@ -103,18 +101,14 @@ def train(args):
             loss.backward()
             optim.step()
 
-            count += 1
-            if count % 500 == 0:
-                entropy = -(posteriors_b * (posteriors_b + 1e-45).log()).sum(dim=1).mean(dim=0).item()
-                uniform = legal_flags_b / (legal_flags_b.sum(dim=1, keepdim=True) + 1e-8)
-                entropy_uni = -(uniform * (uniform + 1e-45).log()).sum(dim=1).mean(dim=0).item()
-                print(f"{count:6d}/{args.n_iter:5d}  policy_loss={policy_loss:.4f} (entropy={entropy:.3f}, entropy_uni={entropy_uni:.3f}) value_loss={value_loss:.4f}")
+        entropy = -(posteriors_b * (posteriors_b + 1e-45).log()).sum(dim=1).mean(dim=0).item()
+        uniform = legal_flags_b / (legal_flags_b.sum(dim=1, keepdim=True) + 1e-8)
+        entropy_uni = -(uniform * (uniform + 1e-45).log()).sum(dim=1).mean(dim=0).item()
+        elapsed = time.time() - start
+        print(f"epoch={e+1}  ({elapsed:.2f} sec)  policy_loss={policy_loss:.3f} (entropy={entropy:.3f}, entropy_uni={entropy_uni:.3f}) value_loss={value_loss:.3f}")
 
-            if count == n_update:
-                break
 
     omega_net.cpu()
-
     torch.save(omega_net.state_dict(), new_model_path)
 
     # save model as ScriptModule (for c++)
@@ -140,9 +134,7 @@ if __name__ == '__main__':
     parser.add_argument('exp_id', type=int)
     parser.add_argument('generation', type=int)
     parser.add_argument('--device-id', type=int, default=0)
-    parser.add_argument('--batch-size', type=int, default=512)
-    parser.add_argument('--n-iter', type=int, default=10000)
-    parser.add_argument('--n-worker', type=int, default=0)
+    parser.add_argument('--Q-frac', type=float, default=0)
     args = parser.parse_args()
 
     print(args)

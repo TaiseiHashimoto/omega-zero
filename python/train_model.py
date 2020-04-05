@@ -14,23 +14,27 @@ def get_window_size(generation, max_size=20, ratio=0.6):
     return min(int(np.ceil((generation+1) * ratio)), max_size)
 
 
-def get_file_names(exp_path, generation, delete_old=True):
+def get_file_paths(exp_path, generation, delete_old=True):
     window_size = get_window_size(generation)
     print(f"window_size = {window_size}")
 
-    file_names = []
+    file_paths = []
     for i in range(generation - window_size + 1, generation + 1):
         path = exp_path / pathlib.Path(f"mldata/{i}.dat")
-        file_names.append(str(path))
+        file_paths.append(path)
 
     if delete_old:
         for i in range(generation - window_size + 1):
-            path = exp_path / pathlib.Path(f"mldata/{i}.dat")
+            path = exp_path / "mldata" / f"{i}.dat"
             if path.exists():
                 print(f"unlink {path}")
                 path.unlink()
+            bu_path = exp_path / "mldata" / f"{i}.pt"
+            if bu_path.exists():
+                print(f"unlink {bu_path}")
+                bu_path.unlink()
 
-    return file_names
+    return file_paths
 
 
 def train(args):
@@ -67,14 +71,16 @@ def train(args):
 
     # load latest model
     omega_net.load_state_dict(torch.load(old_model_path))
-    print(f"load {old_model_path}")
+    print(f"load {old_model_path.name}")
 
     omega_net.to(device)
     optim = torch.optim.AdamW(omega_net.parameters())
+    # optim = torch.optim.AdamW(omega_net.parameters(), lr=0.01)
+    assert omega_net.training
 
-    file_names = get_file_names(exp_path, args.generation)
+    file_paths = get_file_paths(exp_path, args.generation)
     start = time.time()
-    loader = DataLoader(file_names, batch_size)
+    loader = DataLoader(file_paths, batch_size)
     elapsed = time.time() - start
     print(f"load time : {elapsed:.2f} sec")
 
@@ -103,9 +109,9 @@ def train(args):
 
         entropy = -(posteriors_b * (posteriors_b + 1e-45).log()).sum(dim=1).mean(dim=0).item()
         uniform = legal_flags_b / (legal_flags_b.sum(dim=1, keepdim=True) + 1e-8)
-        entropy_uni = -(uniform * (uniform + 1e-45).log()).sum(dim=1).mean(dim=0).item()
+        loss_uni = -(posteriors_b * (uniform + 1e-45).log()).sum(dim=1).mean(dim=0).item()
         elapsed = time.time() - start
-        print(f"epoch={e+1}  ({elapsed:.2f} sec)  policy_loss={policy_loss:.3f} (entropy={entropy:.3f}, entropy_uni={entropy_uni:.3f}) value_loss={value_loss:.3f}")
+        print(f"epoch={e+1}  ({elapsed:.2f} sec)  policy_loss={policy_loss:.3f} (entropy={entropy:.3f}, loss_uni={loss_uni:.3f}) value_loss={value_loss:.3f}")
 
 
     omega_net.cpu()
@@ -119,10 +125,10 @@ def train(args):
     omega_net_traced = torch.jit.trace(omega_net, (black_board_s, white_board_s, side_s, legal_flags_s))
     omega_net_traced.save(str(new_model_jit_path))
 
-    print(f"model saved! ({new_model_path}, {new_model_jit_path})")
+    print(f"model saved! ({new_model_path.name}, {new_model_jit_path.name})")
 
     if args.generation % 5 != 0:  # delete old model
-        print(f"unlink {old_model_path}, {old_model_jit_path}")
+        print(f"unlink {old_model_path.name}, {old_model_jit_path.name}")
         old_model_path.unlink()
         old_model_jit_path.unlink()
 

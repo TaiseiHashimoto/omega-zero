@@ -3,6 +3,7 @@ typedef struct {
     float c_puct;
     float e_frac;
     float d_alpha;
+    int e_step;
 
     int board_size;
     int n_action;

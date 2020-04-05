@@ -43,20 +43,12 @@ void collect_mldata(int thread_id, int n_game, const char *fname) {
         save_game(history, result, fname);
         safe_delete(history[0]);  // delete root -> whole tree
 
-        if (i % 10 == 0 && thread_id % 10 == 0) {
+        if (thread_id % 100 == 0) {
             auto end = std::chrono::system_clock::now();
             int elapsed = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
             float remaining = (float)(elapsed) / (i + 1) * (n_game - i - 1) / 60;
-            printf("[%2d] i=%d (%d sec)  result:%.3f  remaining~%.2f min\n", thread_id, i, elapsed, result, remaining);
+            printf("[%3d] i=%d (%d sec)  remaining~%.2f min\n", thread_id, i, elapsed, remaining);
         }
-
-#if USE_CACHE
-        if (thread_id == 0) {
-            int size, access_count, hit_count;
-            std::tie(size, access_count, hit_count) = get_cache_stats();
-            printf("CACHE INFO   size=%d access_count=%d hit_count=%d hit_rate=%f\n", size, access_count, hit_count, (float)hit_count/access_count);
-        }
-#endif
     }
 
     close(server_sock);

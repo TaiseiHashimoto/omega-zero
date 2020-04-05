@@ -18,8 +18,8 @@ if __name__ == '__main__':
     mldata_dir_path = exp_path / "mldata"
 
     with open(config_path, "r") as f:
-        values = json.load(f)
-    end_generation = values["end_generation"]
+        config = json.load(f)
+    end_generation = config["end_generation"]
 
     if model_dir_path.exists():
         print(f"{model_dir_path} already exists")
@@ -65,7 +65,9 @@ if __name__ == '__main__':
         if model_path.exists():
             print(f"\n{model_path} already exists")
         else:
-            Q_frac = generation / end_generation
+            Q_frac = config["Q_frac"]
+            if config["anneal_Q_frac"]:
+                Q_frac *= generation / end_generation
             model_train_cmd = f"python python/train_model.py {args.exp_id} {generation} --device-id {args.device_id} --Q-frac {Q_frac}"
             print("\n" + model_train_cmd)
             subprocess.check_call(model_train_cmd.split())

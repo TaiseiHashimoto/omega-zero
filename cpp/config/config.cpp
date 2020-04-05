@@ -40,6 +40,7 @@ void init_config(const char *exp_path, int generation, int device_id) {
     config.c_puct = (float)obj["c_puct"].get<double>();
     config.e_frac = (float)obj["e_frac"].get<double>();
     config.d_alpha = (float)obj["d_alpha"].get<double>();
+    config.e_step = (int)obj["e_step"].get<double>();
     // printf("tau=%f c_puct=%f e_frac=%f d_alpha=%f\n", config.tau, config.c_puct, config.e_frac, config.d_alpha);
 
     config.board_size = (int)obj["board_size"].get<double>();

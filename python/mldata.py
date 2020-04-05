@@ -39,7 +39,7 @@ class DataLoader():
                 merged_counts.append(int(m.group(1)))
         if len(merged_counts) > 0:
             self.game_count = min(merged_counts)
-        print(f"TRAIN MODEL  game_count intitlized to {self.game_count}")
+        print(f"PY/MLDATA  game_count intitlized to {self.game_count}")
 
         self.update_count = 0
 
@@ -76,6 +76,8 @@ class DataLoader():
 
 
     def load_data(self):
+        print(f"PY/MLDATA  load data start")
+
         while True:
             new_path = self.mldata_dir_path / f"{self.game_count}.dat"
             if not new_path.exists():
@@ -84,29 +86,29 @@ class DataLoader():
                 # new data not arrived yet
                 if len(new_sub_paths) < self.n_thread:
                     if len(self.mldata_pool) == 0:  # no data available
-                        print("TRAIN MODEL  waiting for data...")
-                        time.sleep(1)
+                        print("PY/MLDATA  waiting for data...")
+                        time.sleep(2)
                         continue
                     else:  # old data available
-                        print("TRAIN MODEL  load data finish")
+                        print("PY/MLDATA  load data finish")
                         break
 
                 # new data arrived (not merged yet)
-                print("TRAIN MODEL  merge mldata files")
+                print("PY/MLDATA  merge mldata files")
                 with open(new_path, "wb") as output_file:
                     for input_path in new_sub_paths:
                         with open(input_path, "rb") as input_file:
                             output_file.write(input_file.read())
                         input_path.unlink()
 
-            print(f"TRAIN MODEL  add mldata {new_path.name}")
+            print(f"PY/MLDATA  add mldata {new_path.name}")
             self.mldata_pool[new_path.name] = self.load_file(new_path)
-            # print(f"TRAIN MODEL  len = {len(self.mldata_pool[new_path.name]['black_board'])}")
+            # print(f"PY/MLDATA  len = {len(self.mldata_pool[new_path.name]['black_board'])}")
 
             if self.game_count >= self.window_size:
                 delete_path = self.mldata_dir_path / f"{self.game_count - self.window_size}.dat"
                 if delete_path.exists():
-                    print(f"TRAIN MODEL  unlink mldata {delete_path.name}")
+                    print(f"PY/MLDATA  unlink mldata {delete_path.name}")
                     delete_path.unlink()
                     # delete dict element if exists
                     self.mldata_pool.pop(delete_path.name, None)
@@ -116,13 +118,13 @@ class DataLoader():
 
             # TODO: prob ok?
             for key in self.select_ratios.keys():
-                self.select_ratios[key] *= 0.9
+                self.select_ratios[key] *= 0.99
             self.select_ratios[new_path.name] = 1.0
-            # print(self.select_ratios)
+            print(self.select_ratios)
 
 
     def load_file(self, file_path):
-        print(f"TRAIN MODEL  load file {file_path.name}")
+        print(f"PY/MLDATA  load file {file_path.name}")
         pos_binary = np.array([1 << i for i in range(64)], dtype=np.uint64)
 
         black_bitboard = []
@@ -135,7 +137,7 @@ class DataLoader():
 
         with open(file_path, "rb") as file:
             entry = Entry()
-            # print(f"TRAIN MODEL  load data from {file_path}")
+            # print(f"PY/MLDATA  load data from {file_path}")
             while file.readinto(entry):
                 black_bitboard.append(entry.black_bitboard)
                 white_bitboard.append(entry.white_bitboard)

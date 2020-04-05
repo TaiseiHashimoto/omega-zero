@@ -93,7 +93,7 @@ int extract_generation(std::string model_fname) {
     // skip .pt (length: 3)
     int end = model_fname.length() - 4;
     for (int i = end; i >= 0; i--) {
-        if (model_fname[i] == '_') {
+        if (model_fname[i] == '/') {
             start = i + 1;
             break;
         }
@@ -111,7 +111,7 @@ void init_model() {
     if (torch::cuda::is_available() && config.device_id >= 0) {
         device = {torch::kCUDA, (short int)config.device_id};
     }
-    std::cout << "MODEL  using " << device << std::endl;
+    std::cout << "CPP/MODEL  using " << device << std::endl;
 
     omega_net = OmegaNet(config.board_size, config.n_action, config.n_res_block, config.res_filter, config.head_filter, config.value_hidden);
     omega_net->eval();
@@ -126,15 +126,12 @@ int load_model(int current_generation) {
     if (config.generation >= 0) {
         // generation is spacified
         new_generation = config.generation;
-        sprintf(model_fname, "%s/model_jit_%d.pt", config.model_dname, config.generation);
+        sprintf(model_fname, "%s/%d.pt", config.model_jit_dname, config.generation);
     } else {
         // find the newest model
         std::string model_fname_str;
-        for (const auto & entry : std::experimental::filesystem::directory_iterator(config.model_dname)) {
+        for (const auto & entry : std::experimental::filesystem::directory_iterator(config.model_jit_dname)) {
             std::string entry_path = entry.path().string();
-            if (entry_path.find("_jit_") == std::string::npos) {
-                continue;
-            }
             int generation = extract_generation(entry_path);
             if (generation > new_generation) {
                 new_generation = generation;
@@ -145,16 +142,16 @@ int load_model(int current_generation) {
         if (new_generation > current_generation) {  // new model found
             strcpy(model_fname, model_fname_str.c_str());
         } else {
-            std::cout << "MODEL  new model not created yet" << std::endl;
+            std::cout << "CPP/MODEL  new model not created yet" << std::endl;
             return current_generation;
         }
     }
 
     try {
-        printf("MODEL  load model %s\n", basename(model_fname));
+        printf("CPP/MODEL  load model %s\n", basename(model_fname));
         torch::load(omega_net, model_fname);
     } catch (const c10::Error& e) {
-        fprintf(stderr, "MODEL  error loading the model\n");
+        fprintf(stderr, "CPP/MODEL  error loading the model\n");
         exit(-1);
     }
 

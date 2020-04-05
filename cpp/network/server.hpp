@@ -8,6 +8,7 @@
 
 #define TIMEOUT_USEC 500
 #define MAX_TIMEOUT 4
+#define MAX_TRY 5
 
 
 typedef struct {

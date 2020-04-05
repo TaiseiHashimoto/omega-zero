@@ -17,7 +17,7 @@ typedef struct {
     int n_simulation;
     int device_id;
     int generation;
-    char model_dname[100];
+    char model_jit_dname[100];
 } config_t;
 
 void init_config(const char *exp_path, int device_id);

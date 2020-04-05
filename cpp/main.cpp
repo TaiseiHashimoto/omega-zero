@@ -13,7 +13,7 @@
 #include "config.hpp"
 
 
-void collect_mldata(int thread_id, int total_game, const char *exp_path) {
+void collect_mldata(int thread_id, int total_game_each, const char *exp_path) {
     int server_sock = connect_to_server();  // NN server
 
     std::random_device seed_gen;
@@ -22,16 +22,16 @@ void collect_mldata(int thread_id, int total_game, const char *exp_path) {
     char fname[100], fname_merged[100];
     auto start = std::chrono::system_clock::now();
 
-    for (int i = 0; i < total_game; i++) {
+    for (int i = 0; i < total_game_each; i++) {
         // create "[game id]_[thread id].dat"
         sprintf(fname, "%s/mldata/%d_%d.dat", exp_path, i, thread_id);
         if (access(fname, F_OK) != -1) {
-            fprintf(stderr, "MAIN  WARNING: data file %s already exists\n", basename(fname));
+            fprintf(stderr, "CPP/MAIN  WARNING: data file %s already exists\n", basename(fname));
             continue;
         }
         sprintf(fname_merged, "%s/mldata/%d.dat", exp_path, i);
         if (access(fname_merged, F_OK) != -1) {
-            fprintf(stderr, "MAIN  WARNING: data file %s already exists\n", basename(fname_merged));
+            fprintf(stderr, "CPP/MAIN  WARNING: data file %s already exists\n", basename(fname_merged));
             continue;
         }
 
@@ -52,9 +52,9 @@ void collect_mldata(int thread_id, int total_game, const char *exp_path) {
 
         if (thread_id % 100 == 0) {
             auto end = std::chrono::system_clock::now();
-            int elapsed = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
-            float remaining = (float)(elapsed) / (i + 1) * (total_game - i - 1) / 60;
-            printf("MAIN  [%2d] i=%d (%d sec)  result:%.3f  remaining~%.2f min\n", thread_id, i, elapsed, result, remaining);
+            float elapsed = (float)std::chrono::duration_cast<std::chrono::seconds>(end - start).count() / 60.0;
+            float remaining = elapsed / (i + 1) * (total_game_each - i - 1) / 60.0;
+            printf("CPP/MAIN  [%3d] %d/%d (%.2f hour)  result:%.3f  remaining~%.2f min\n", thread_id, i+1, total_game_each, elapsed, result, remaining);
         }
     }
 
@@ -64,15 +64,15 @@ void collect_mldata(int thread_id, int total_game, const char *exp_path) {
 
 int main(int argc, char *argv[]) {
     if ((argc < 2) || (argc > 2 && argv[2][0] != '-')) {
-        std::cerr << "MAIN  Usage: main exp_id [--device_id=ID]" << std::endl;
+        std::cerr << "CPP/MAIN  Usage: main exp_id [--device_id=ID]" << std::endl;
         exit(-1);
     }
     int exp_id = atoi(argv[1]);
-    std::cout << "MAIN  exp_id = " << exp_id << std::endl;
+    std::cout << "CPP/MAIN  exp_id = " << exp_id << std::endl;
 
     char exp_path[100];
     get_exp_path(argv[0], exp_id, exp_path);
-    std::cout << "MAIN  exp_path = " << exp_path << std::endl;
+    std::cout << "CPP/MAIN  exp_path = " << exp_path << std::endl;
 
     int device_id = 0;
 
@@ -87,16 +87,16 @@ int main(int argc, char *argv[]) {
                 device_id = atoi(optarg);
                 break;
             default:
-                fprintf(stderr, "MAIN  unknown option\n");
+                fprintf(stderr, "CPP/MAIN  unknown option\n");
                 exit(-1);
         }
     }
-    std::cout << "MAIN  device_id = " << device_id << std::endl;
+    std::cout << "CPP/MAIN  device_id = " << device_id << std::endl;
 
     init_config(exp_path, device_id);
 
     const auto& config = get_config();
-    int total_game_each = (config.total_game + config.n_thread - 1) / config.n_thread;
+    int total_game_each = config.total_game / config.n_thread;
 
     pid_t server_pid = create_server_process();
     (void)server_pid;

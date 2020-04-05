@@ -58,8 +58,8 @@ void init_config(const char *exp_path, int device_id) {
 
     config.device_id = device_id;
     config.generation = -1;
-    sprintf(config.model_dname, "%s/model", exp_path);
-    // printf("CONFIG  model_fname=%s\n", config.model_fname);
+    sprintf(config.model_jit_dname, "%s/model_jit", exp_path);
+    // printf("CONFIG  model_jit_dname=%s\n", config.model_jit_dname);
 }
 
 const config_t& get_config() {

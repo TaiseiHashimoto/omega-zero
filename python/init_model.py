@@ -13,9 +13,8 @@ if __name__ == '__main__':
     root_path = pathlib.Path(__file__).resolve().parents[1]
     exp_path = root_path / "exp" / str(args.exp_id)
     config_path = exp_path / "config.json"
-    model_dir_path = exp_path / "model"
-    model_path = model_dir_path / 'model_0.pt'
-    model_jit_path = model_dir_path / 'model_jit_0.pt'
+    model_path = exp_path / "model" / "0.pt"
+    model_jit_path = exp_path / "model_jit" / "0.pt"
     # print(f"config_path={config_path}")
     # print(f"model_path={model_path}")
     # print(f"model_jit_path={model_jit_path}")

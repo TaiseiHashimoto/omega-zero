@@ -31,28 +31,28 @@ int connect_to_clients(int pipe_fd, std::vector<int>& client_socks) {
 
     int listen_sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (listen_sock < 0){
-        fprintf(stderr, "SERVER  socket error %s\n", strerror(errno));
+        fprintf(stderr, "CPP/SERVER  socket error %s\n", strerror(errno));
         exit(-1);
     }
     if(bind(listen_sock, (struct sockaddr *)&server_addr, sizeof(struct sockaddr_un)) < 0){
-        fprintf(stderr, "SERVER  bind error %s\n", strerror(errno));
+        fprintf(stderr, "CPP/SERVER  bind error %s\n", strerror(errno));
         exit(-1);
     }
     if(listen(listen_sock, 128) < 0){
-        fprintf(stderr, "SERVER  listen error %s\n", strerror(errno));
+        fprintf(stderr, "CPP/SERVER  listen error %s\n", strerror(errno));
         exit(-1);
     }
 
     int retval = write(pipe_fd, "DONE", 4);  // send done message to parent process
     if (retval < 0){
-        fprintf(stderr, "SERVER  write error %s\n", strerror(errno));
+        fprintf(stderr, "CPP/SERVER  write error %s\n", strerror(errno));
         exit(-1);
     }
 
     for (int i = 0; i < config.n_thread; i++) {
         client_socks[i] = accept(listen_sock, NULL, NULL);
         if(client_socks[i] < 0){
-            fprintf(stderr, "SERVER  accept error %s\n", strerror(errno));
+            fprintf(stderr, "CPP/SERVER  accept error %s\n", strerror(errno));
             exit(-1);
         }
     }
@@ -62,12 +62,12 @@ int connect_to_clients(int pipe_fd, std::vector<int>& client_socks) {
 void run_server(int pipe_fd) {
     const auto& config = get_config();
 
-    printf("SERVER  server start\n");
+    printf("CPP/SERVER  server start\n");
     init_model();
 
     std::vector<int> client_socks(config.n_thread);
     int listen_sock = connect_to_clients(pipe_fd, client_socks);
-    printf("SERVER  accepted %d clients\n", config.n_thread);
+    printf("CPP/SERVER  accepted %d clients\n", config.n_thread);
 
     // initialization for select()
     int maxfd = 0;
@@ -97,6 +97,7 @@ void run_server(int pipe_fd) {
         if (total_count % (60 * config.n_simulation) == 0) {  // approx. every 1 game
             generation = load_model(generation);
             total_count = 0;  // reset count
+            printf("CPP/SERVER  server running...\n");
         }
 
         std::vector<int> to_respond;
@@ -131,10 +132,10 @@ void run_server(int pipe_fd) {
                     retval = read(client_socks[i], &recv_data[i], sizeof(input_t));
 
                     if (retval < 0) {
-                        fprintf(stderr, "SERVER  read error %s\n", strerror(errno));
+                        fprintf(stderr, "CPP/SERVER  read error %s\n", strerror(errno));
                         exit(-1);
                     } else if (retval == 0) {
-                        // fprintf(stdout, "SERVER  disconnected by client %d\n", i);
+                        // fprintf(stdout, "CPP/SERVER  disconnected by client %d\n", i);
                         FD_CLR(client_socks[i], &fds_org);  // stop monitoring this client
                         n_disc += 1;
                         continue;
@@ -142,13 +143,13 @@ void run_server(int pipe_fd) {
 
                     to_respond.push_back(i);  // exclude disconnection
                     n_recv += 1;  // include disconnection
-                    // fprintf(stdout, "SERVER  receive %d from client %d\n", recv_data[i].num_i, i);
+                    // fprintf(stdout, "CPP/SERVER  receive %d from client %d\n", recv_data[i].num_i, i);
                 }
                 // else {
-                //     // fprintf(stdout, "SERVER  no data from client %d\n", i);
+                //     // fprintf(stdout, "CPP/SERVER  no data from client %d\n", i);
                 // }
             }
-            // printf("SERVER  timeout_count = %d, n_recv = %d\n", timeout_count, n_recv);
+            // printf("CPP/SERVER  timeout_count = %d, n_recv = %d\n", timeout_count, n_recv);
         }
 
         if (n_disc == config.n_thread) {  // all clients disconnected
@@ -163,7 +164,7 @@ void run_server(int pipe_fd) {
         for (int idx : to_respond) {
             retval = write(client_socks[idx], &send_data[idx], sizeof(output_t));
             if (retval < 0){
-                fprintf(stderr, "SERVER  write error %s\n", strerror(errno));
+                fprintf(stderr, "CPP/SERVER  write error %s\n", strerror(errno));
                 exit(-1);
             }
         }
@@ -172,9 +173,9 @@ void run_server(int pipe_fd) {
             // end = std::chrono::system_clock::now();
             // elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() * 1e-3;
             // occupancy_rate = (float)n_recv / config.n_thread;
-            // printf("SERVER  %d: occupancy_rate=%.3f\n", total_count, occupancy_rate);
+            // printf("CPP/SERVER  %d: occupancy_rate=%.3f\n", total_count, occupancy_rate);
             // work_time = work_time * 0.99 + elapsed * 0.01;
-            // printf("SERVER  work_time=%.3f\n", work_time);
+            // printf("CPP/SERVER  work_time=%.3f\n", work_time);
         // }
     }
 
@@ -202,13 +203,13 @@ pid_t create_server_process() {
     // create pipe to receive sign of preparation completion
     int pipe_c2p[2];
     if (pipe(pipe_c2p) < 0) {
-        fprintf(stderr, "SERVER  pipe error %s\n", strerror(errno));
+        fprintf(stderr, "CPP/SERVER  pipe error %s\n", strerror(errno));
         exit(-1);
     }
 
     pid_t pid = fork();
     if (pid < 0) {
-        fprintf(stderr, "SERVER  fork error %s\n", strerror(errno));
+        fprintf(stderr, "CPP/SERVER  fork error %s\n", strerror(errno));
         close(pipe_c2p[PIPE_READ]);
         close(pipe_c2p[PIPE_WRITE]);
         exit(-1);
@@ -222,11 +223,11 @@ pid_t create_server_process() {
     char buf[4];
     int retval = read(pipe_c2p[PIPE_READ], buf, 4);
     if (retval <= 0) {
-        fprintf(stderr, "SERVER  read error %s\n", strerror(errno));
+        fprintf(stderr, "CPP/SERVER  read error %s\n", strerror(errno));
         exit(-1);
     }
     if (strcmp(buf, "DONE") != 0) {
-        fprintf(stderr, "SERVER  message error \"%s\" != \"DONE\"\n", buf);
+        fprintf(stderr, "CPP/SERVER  message error \"%s\" != \"DONE\"\n", buf);
     }
     // printf("received \"%s\" from server\n", buf);
     close(pipe_c2p[0]);
@@ -238,11 +239,11 @@ pid_t create_server_process() {
 int connect_to_server() {
     int server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (server_sock < 0){
-        fprintf(stderr, "SERVER  socket error %s\n", strerror(errno));
+        fprintf(stderr, "CPP/SERVER  socket error %s\n", strerror(errno));
         exit(-1);
     }
     if (connect(server_sock, (struct sockaddr *)&server_addr, sizeof(struct sockaddr_un)) < 0){
-        fprintf(stderr, "SERVER  connect error %s\n", strerror(errno));
+        fprintf(stderr, "CPP/SERVER  connect error %s\n", strerror(errno));
         exit(-1);
     }
     return server_sock;
@@ -252,8 +253,8 @@ int connect_to_server() {
 void request(int server_sock, const Board& board, const Side side, const std::vector<bool>& legal_flags, std::vector<float>& priors, float& value) {
     // thread_local int call_count = 0;
     // thread_local float wait_time = 1.0;  // msec
-
     int retval;
+
     input_t send_data;
     send_data.black_board = board.get_black_board();
     send_data.white_board = board.get_white_board();
@@ -261,19 +262,31 @@ void request(int server_sock, const Board& board, const Side side, const std::ve
     std::copy(legal_flags.begin(), legal_flags.end(), std::begin(send_data.legal_flags));
 
     // auto start = std::chrono::system_clock::now();
-    retval = write(server_sock, &send_data, sizeof(input_t));
-    if (retval < 0){
-        fprintf(stderr, "SERVER  write error %s\n", strerror(errno));
-        exit(-1);
+    // TODO: connection reset by peer
+    for (int i = 0; i < MAX_TRY; i++) {
+        retval = write(server_sock, &send_data, sizeof(input_t));
+        if (retval < 0) {
+            fprintf(stderr, "CPP/SERVER  write error %s  (%d try)\n", strerror(errno), i+1);
+            if (i == MAX_TRY - 1) {
+                exit(-1);
+            }
+        } else {
+            break;
+        }
     }
 
     output_t recv_data;
-    retval = read(server_sock, &recv_data, sizeof(output_t));
-    if (retval < 0){
-        fprintf(stderr, "SERVER  read error %s\n", strerror(errno));
-        exit(-1);
+    for (int i = 0; i < MAX_TRY; i++) {
+        retval = read(server_sock, &recv_data, sizeof(output_t));
+        if (retval < 0) {
+            fprintf(stderr, "CPP/SERVER  read error %s  (%d try)\n", strerror(errno), i+1);
+            if (i == MAX_TRY - 1) {
+                exit(-1);
+            }
+        } else {
+            break;
+        }
     }
-    assert(retval > 0);
 
     // auto end = std::chrono::system_clock::now();
     // float elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() * 1e-3;

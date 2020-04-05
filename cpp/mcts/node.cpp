@@ -151,14 +151,14 @@ GameNode* GameNode::select_child() const {
 
     float max_score = -1;  // -1 <= score
     GameNode* selected = nullptr;
-    // printf("selecting...\n");
+    // printf("NODE  selecting...\n");
     // int i = 0;
     for (const auto& child : m_children) {
         float value_score = -child->Q();  // flip opponent's value
         // TODO: log term necessary?
         float prior_score = child->prior() * std::sqrt(m_N) / (child->N() + 1);
         float score = value_score + config.c_puct * prior_score;
-        // std::cout << m_legal_actions[i] << ":(" << value_score << "," << prior_score << ") ";
+        // std::cout << "NODE  " << m_legal_actions[i] << ":(" << value_score << "," << prior_score << ") ";
         // i++;
         if (max_score <= score) {
             max_score = score;
@@ -238,7 +238,7 @@ void GameNode::add_exploration_noise(std::default_random_engine& engine) {
         random_dirichlet(engine, config.d_alpha, noise);
     }
 
-    // std::cout << "noise = [";
+    // std::cout << "NODE  " << "noise = [";
     for (int i = 0; i < n; i++) {
         float org_prior = m_children[i]->prior();
         float new_prior =  org_prior * (1 - config.e_frac) + noise[i] * config.e_frac;

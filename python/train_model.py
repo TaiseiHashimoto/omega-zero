@@ -4,82 +4,84 @@ import numpy as np
 import argparse
 import pathlib
 import json
-import time
+import datetime
+import re
 
 from model import OmegaNet
 from mldata import DataLoader
 
 
-def get_window_size(generation, max_size=20, ratio=0.6):
-    return min(int(np.ceil((generation+1) * ratio)), max_size)
+def save_model(model, model_dir_path, generation, config):
+    model_path = model_dir_path / f"model_{generation}.pt"
+    model_jit_path = model_dir_path / f"model_jit_{generation}.pt"
 
+    torch.save(model.state_dict(), model_path)
 
-def get_file_names(exp_path, generation, delete_old=True):
-    window_size = get_window_size(generation)
-    print(f"window_size = {window_size}")
+    # save model as ScriptModule (for c++)
+    black_board_dummy = torch.rand(1, config["board_size"], config["board_size"])
+    white_board_dummy = torch.rand(1, config["board_size"], config["board_size"])
+    side_dummy = torch.rand(1)
+    legal_flags_dummy = torch.rand(1, config["n_action"])
+    model_jit = torch.jit.trace(model, (black_board_dummy, white_board_dummy, side_dummy, legal_flags_dummy))
+    model_jit.save(str(model_jit_path))
 
-    file_names = []
-    for i in range(generation - window_size + 1, generation + 1):
-        path = exp_path / pathlib.Path(f"mldata/{i}.dat")
-        file_names.append(str(path))
-
-    if delete_old:
-        for i in range(generation - window_size + 1):
-            path = exp_path / pathlib.Path(f"mldata/{i}.dat")
-            if path.exists():
-                print(f"unlink {path}")
-                path.unlink()
-
-    return file_names
+    print(f"TRAIN MODEL  model saved! ({model_path.name}, {model_jit_path.name})")
 
 
 def train(args):
     if torch.cuda.is_available():
         device = torch.device(f"cuda:{args.device_id}")
-    print(f"using {device}")
+    print(f"TRAIN MODEL  using {device}")
 
     root_path = pathlib.Path(__file__).resolve().parents[1]
     exp_path = root_path / "exp" / str(args.exp_id)
     config_path = exp_path / "config.json"
-    old_model_path = exp_path / "model" / f"model_{args.generation}.pt"
-    old_model_jit_path = exp_path / "model" / f"model_jit_{args.generation}.pt"
-    new_model_path = exp_path / "model" / f"model_{args.generation+1}.pt"
-    new_model_jit_path = exp_path / "model" / f"model_jit_{args.generation+1}.pt"
-
-    if new_model_path.exists():
-        print(f"ERROR: model already exists ({new_model_path})")
-        exit(-1)
+    model_dir_path = exp_path / "model"
+    mldata_dir_path = exp_path / "mldata"
 
     with open(config_path, "r") as f:
-        values = json.load(f)
+        config = json.load(f)
 
     omega_net = OmegaNet(
-        board_size=values["board_size"],
-        n_action=values["n_action"],
-        n_res_block=values["n_res_block"],
-        res_filter=values["res_filter"],
-        head_filter=values["head_filter"],
-        value_hidden=values["value_hidden"]
+        board_size=config["board_size"],
+        n_action=config["n_action"],
+        n_res_block=config["n_res_block"],
+        res_filter=config["res_filter"],
+        head_filter=config["head_filter"],
+        value_hidden=config["value_hidden"]
     )
 
-    epoch = values["epoch"]
-    batch_size = values["batch_size"]
+    window_size = config["window_size"]
+    Q_frac = config["Q_frac"]
+    batch_size = config["batch_size"]
+    n_update = config["n_update"]
+    n_thread = config["n_thread"]
+    total_game = config["total_game"] // n_thread
 
-    # load latest model
-    omega_net.load_state_dict(torch.load(old_model_path))
-    print(f"load {old_model_path}")
+    loader = DataLoader(mldata_dir_path, window_size, batch_size, n_update, n_thread)
 
+    # find the latest model
+    generation = -1
+    for model_path in model_dir_path.glob("model_*.pt"):
+        m = re.search(r"model_([0-9]+).pt", str(model_path))
+        if m:
+            generation = max(int(m.group(1)), generation)
+
+    print(f"TRAIN MODEL  generation initialized to {generation}")
+    assert generation >= 0
+
+    model_path = model_dir_path / f"model_{generation}.pt"
+    print(f"TRAIN MODEL  load latest model {model_path.name}")
+    omega_net.load_state_dict(torch.load(model_path))
     omega_net.to(device)
     optim = torch.optim.AdamW(omega_net.parameters())
 
-    file_names = get_file_names(exp_path, args.generation)
-    start = time.time()
-    loader = DataLoader(file_names, batch_size)
-    elapsed = time.time() - start
-    print(f"load time : {elapsed:.2f} sec")
+    epoch = 0
+    start = datetime.datetime.now()
 
-    start = time.time()
-    for e in range(epoch):
+    while True:
+        loader.load_data()
+
         for black_board_b, white_board_b, side_b, legal_flags_b, result_b, Q_b, posteriors_b in loader:
             black_board_b = black_board_b.to(device)
             white_board_b = white_board_b.to(device)
@@ -93,7 +95,7 @@ def train(args):
 
             policy_loss = -(posteriors_b * policy_logit_b).sum(dim=1).mean(dim=0)
 
-            value_target_b = result_b * (1 - args.Q_frac) + Q_b * args.Q_frac
+            value_target_b = result_b * (1 - Q_frac) + Q_b * Q_frac
             value_loss = (value_pred_b - value_target_b).pow(2).mean(dim=0)
 
             loss = policy_loss + value_loss
@@ -101,41 +103,33 @@ def train(args):
             loss.backward()
             optim.step()
 
+        generation += 1
+        elapsed = datetime.datetime.now() - start
+        print(f"TRAIN MODEL  generation={generation} game_count={loader.game_count} ({elapsed})")
         entropy = -(posteriors_b * (posteriors_b + 1e-45).log()).sum(dim=1).mean(dim=0).item()
         uniform = legal_flags_b / (legal_flags_b.sum(dim=1, keepdim=True) + 1e-8)
         entropy_uni = -(uniform * (uniform + 1e-45).log()).sum(dim=1).mean(dim=0).item()
-        elapsed = time.time() - start
-        print(f"epoch={e+1}  ({elapsed:.2f} sec)  policy_loss={policy_loss:.3f} (entropy={entropy:.3f}, entropy_uni={entropy_uni:.3f}) value_loss={value_loss:.3f}")
+        print(f"TRAIN MODEL  policy_loss={policy_loss:.3f} (entropy={entropy:.3f}, entropy_uni={entropy_uni:.3f}) value_loss={value_loss:.3f}")
 
+        omega_net.cpu()
+        save_model(omega_net, model_dir_path, generation, config)
+        omega_net.to(device)
 
-    omega_net.cpu()
-    torch.save(omega_net.state_dict(), new_model_path)
+        if (generation-1) % 5 != 0:  # delete old model
+            old_model_path = model_dir_path / f"model_{generation-1}.pt"
+            old_model_jit_path = model_dir_path / f"model_jit_{generation-1}.pt"
+            print(f"TRAIN MODEL  unlink {old_model_path.name}, {old_model_jit_path.name}")
+            old_model_path.unlink()
+            old_model_jit_path.unlink()
 
-    # save model as ScriptModule (for c++)
-    black_board_s = black_board_b[:1].cpu()
-    white_board_s = white_board_b[:1].cpu()
-    side_s = side_b[:1].cpu()
-    legal_flags_s = legal_flags_b[:1].cpu()
-    omega_net_traced = torch.jit.trace(omega_net, (black_board_s, white_board_s, side_s, legal_flags_s))
-    omega_net_traced.save(str(new_model_jit_path))
-
-    print(f"model saved! ({new_model_path}, {new_model_jit_path})")
-
-    if args.generation % 5 != 0:  # delete old model
-        print(f"unlink {old_model_path}, {old_model_jit_path}")
-        old_model_path.unlink()
-        old_model_jit_path.unlink()
+        if loader.game_count == total_game:
+            break
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    # generation >= 0
-    # train (generation+1)-th model using data from (generation)-th model
     parser.add_argument('exp_id', type=int)
-    parser.add_argument('generation', type=int)
     parser.add_argument('--device-id', type=int, default=0)
-    parser.add_argument('--Q-frac', type=float, default=0)
     args = parser.parse_args()
 
-    print(args)
     train(args)

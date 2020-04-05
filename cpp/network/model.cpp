@@ -1,6 +1,9 @@
 #include <torch/torch.h>
 #include <iostream>
 #include <vector>
+#include <string>
+#include <cstring>
+#include <experimental/filesystem>
 
 #include "model.hpp"
 #include "server.hpp"
@@ -81,28 +84,82 @@ std::tuple<torch::Tensor, torch::Tensor> OmegaNetImpl::forward(const torch::Tens
 
 
 namespace {
-    torch::Device device{torch::kCPU};
-    OmegaNet omega_net{nullptr};
+
+torch::Device device{torch::kCPU};
+OmegaNet omega_net{nullptr};
+
+int extract_generation(std::string model_fname) {
+    int start = -1;
+    // skip .pt (length: 3)
+    int end = model_fname.length() - 4;
+    for (int i = end; i >= 0; i--) {
+        if (model_fname[i] == '_') {
+            start = i + 1;
+            break;
+        }
+    }
+    assert(start >= 0);
+    std::string generation_str = model_fname.substr(start, end - start + 1);
+    return std::stoi(generation_str);
 }
+
+} // namespace
 
 void init_model() {
     const auto& config = get_config();
 
-    if (torch::cuda::is_available()) {
+    if (torch::cuda::is_available() && config.device_id >= 0) {
         device = {torch::kCUDA, (short int)config.device_id};
     }
-    std::cout << "using " << device << std::endl;
+    std::cout << "MODEL  using " << device << std::endl;
 
     omega_net = OmegaNet(config.board_size, config.n_action, config.n_res_block, config.res_filter, config.head_filter, config.value_hidden);
+    omega_net->eval();
+}
+
+int load_model(int current_generation) {
+    const auto& config = get_config();
+
+    char model_fname[200];
+    int new_generation = -1;
+
+    if (config.generation >= 0) {
+        // generation is spacified
+        new_generation = config.generation;
+        sprintf(model_fname, "%s/model_jit_%d.pt", config.model_dname, config.generation);
+    } else {
+        // find the newest model
+        std::string model_fname_str;
+        for (const auto & entry : std::experimental::filesystem::directory_iterator(config.model_dname)) {
+            std::string entry_path = entry.path().string();
+            if (entry_path.find("_jit_") == std::string::npos) {
+                continue;
+            }
+            int generation = extract_generation(entry_path);
+            if (generation > new_generation) {
+                new_generation = generation;
+                model_fname_str = entry.path().string();
+            }
+        }
+
+        if (new_generation > current_generation) {  // new model found
+            strcpy(model_fname, model_fname_str.c_str());
+        } else {
+            std::cout << "MODEL  new model not created yet" << std::endl;
+            return current_generation;
+        }
+    }
+
     try {
-        printf("load model %s\n", config.model_fname);
-        torch::load(omega_net, config.model_fname);
+        printf("MODEL  load model %s\n", basename(model_fname));
+        torch::load(omega_net, model_fname);
     } catch (const c10::Error& e) {
-        fprintf(stderr, "error loading the model\n");
+        fprintf(stderr, "MODEL  error loading the model\n");
         exit(-1);
     }
+
     omega_net->to(device);
-    omega_net->eval();
+    return new_generation;
 }
 
 void inference(const input_t *recv_data, output_t *send_data) {

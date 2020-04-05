@@ -7,4 +7,9 @@ add_library(network STATIC
     "${PROJECT_SOURCE_DIR}/config/config.hpp"
 )
 
-target_link_libraries(network Threads::Threads ${TORCH_LIBRARIES} config)
+target_link_libraries(network
+    Threads::Threads
+    ${TORCH_LIBRARIES}
+    stdc++fs  # for filesytem
+    config
+)

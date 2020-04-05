@@ -23,7 +23,7 @@ void pack_data(GameNode* node, float result, entry_t &entry) {
 
 void save_game(std::vector<GameNode*> &history, float result, const char* fname) {
     // result: soft result from black side
-    // printf("save game  fname=%s size=%ld\n", fname, history.size());
+    // printf("MLDATA  save game  fname=%s size=%ld\n", fname, history.size());
     std::ofstream file(fname, std::ios::binary | std::ios::app);
     for (auto node : history) {
         entry_t entry;

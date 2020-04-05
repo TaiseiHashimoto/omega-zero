@@ -79,7 +79,7 @@ std::ostream& operator<<(std::ostream& os, Action action)
     } else if (action < 64) {
         os << static_cast<char>('a' + action % 8) << static_cast<char>('1' + action / 8);
     } else {
-        fprintf(stderr, "unknown action (%d)\n", action);
+        fprintf(stderr, "BOARD  unknown action (%d)\n", action);
         exit(-1);
     }
     return os;

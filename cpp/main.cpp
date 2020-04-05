@@ -13,21 +13,28 @@
 #include "config.hpp"
 
 
-void collect_mldata(int thread_id, int n_game, const char *fname) {
+void collect_mldata(int thread_id, int total_game, const char *exp_path) {
     int server_sock = connect_to_server();  // NN server
-
-    if (access(fname, F_OK) != -1) {
-        fprintf(stderr, "ERROR: data file %s already exists\n", fname);
-        close(server_sock);
-        return;
-    }
 
     std::random_device seed_gen;
     std::default_random_engine engine(seed_gen());
 
+    char fname[100], fname_merged[100];
     auto start = std::chrono::system_clock::now();
 
-    for (int i = 0; i < n_game; i++) {
+    for (int i = 0; i < total_game; i++) {
+        // create "[game id]_[thread id].dat"
+        sprintf(fname, "%s/mldata/%d_%d.dat", exp_path, i, thread_id);
+        if (access(fname, F_OK) != -1) {
+            fprintf(stderr, "MAIN  WARNING: data file %s already exists\n", basename(fname));
+            continue;
+        }
+        sprintf(fname_merged, "%s/mldata/%d.dat", exp_path, i);
+        if (access(fname_merged, F_OK) != -1) {
+            fprintf(stderr, "MAIN  WARNING: data file %s already exists\n", basename(fname_merged));
+            continue;
+        }
+
         std::vector<GameNode*> history;
         play_game(history, server_sock, engine);
 
@@ -43,20 +50,12 @@ void collect_mldata(int thread_id, int n_game, const char *fname) {
         save_game(history, result, fname);
         safe_delete(history[0]);  // delete root -> whole tree
 
-        if (i % 10 == 0 && thread_id % 10 == 0) {
+        if (thread_id % 100 == 0) {
             auto end = std::chrono::system_clock::now();
             int elapsed = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
-            float remaining = (float)(elapsed) / (i + 1) * (n_game - i - 1) / 60;
-            printf("[%2d] i=%d (%d sec)  result:%.3f  remaining~%.2f min\n", thread_id, i, elapsed, result, remaining);
+            float remaining = (float)(elapsed) / (i + 1) * (total_game - i - 1) / 60;
+            printf("MAIN  [%2d] i=%d (%d sec)  result:%.3f  remaining~%.2f min\n", thread_id, i, elapsed, result, remaining);
         }
-
-#if USE_CACHE
-        if (thread_id == 0) {
-            int size, access_count, hit_count;
-            std::tie(size, access_count, hit_count) = get_cache_stats();
-            printf("CACHE INFO   size=%d access_count=%d hit_count=%d hit_rate=%f\n", size, access_count, hit_count, (float)hit_count/access_count);
-        }
-#endif
     }
 
     close(server_sock);
@@ -64,18 +63,16 @@ void collect_mldata(int thread_id, int n_game, const char *fname) {
 
 
 int main(int argc, char *argv[]) {
-    if ((argc < 3) || (argc > 3 && argv[3][0] != '-')) {
-        std::cerr << "Usage: main exp_id generation [--device_id=ID]" << std::endl;
+    if ((argc < 2) || (argc > 2 && argv[2][0] != '-')) {
+        std::cerr << "MAIN  Usage: main exp_id [--device_id=ID]" << std::endl;
         exit(-1);
     }
     int exp_id = atoi(argv[1]);
-    int generation = atoi(argv[2]);
-    std::cout << "exp_id = " << exp_id << std::endl;
-    std::cout << "generation = " << generation << std::endl;
+    std::cout << "MAIN  exp_id = " << exp_id << std::endl;
 
     char exp_path[100];
     get_exp_path(argv[0], exp_id, exp_path);
-    std::cout << "exp_path = " << exp_path << std::endl;
+    std::cout << "MAIN  exp_path = " << exp_path << std::endl;
 
     int device_id = 0;
 
@@ -90,32 +87,26 @@ int main(int argc, char *argv[]) {
                 device_id = atoi(optarg);
                 break;
             default:
-                fprintf(stderr, "unknown option\n");
+                fprintf(stderr, "MAIN  unknown option\n");
                 exit(-1);
         }
     }
-    std::cout << "device_id = " << device_id << std::endl;
+    std::cout << "MAIN  device_id = " << device_id << std::endl;
 
-    init_config(exp_path, generation, device_id);
+    init_config(exp_path, device_id);
 
     const auto& config = get_config();
-    int n_game_each = (config.n_game + config.n_thread - 1) / config.n_thread;
+    int total_game_each = (config.total_game + config.n_thread - 1) / config.n_thread;
 
     pid_t server_pid = create_server_process();
     (void)server_pid;
 
     std::vector<std::thread> client_threads(config.n_thread);
-    std::vector<char*> fnames(config.n_thread);
-
     for (int i = 0; i < config.n_thread; i++) {
-        fnames[i] = new char[100];
-        sprintf(fnames[i], "%s/mldata/%d_%d.dat", exp_path, generation, i);
-        // printf("start creating %s\n", fnames[i]);
-        client_threads[i] = std::thread(collect_mldata, i, n_game_each, fnames[i]);
+        client_threads[i] = std::thread(collect_mldata, i, total_game_each, exp_path);
     }
     for (int i = 0; i < config.n_thread; i++) {
         client_threads[i].join();
-        delete[] fnames[i];
     }
 
     return 0;

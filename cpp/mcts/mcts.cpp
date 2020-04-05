@@ -23,9 +23,10 @@ void play_game(std::vector<GameNode*>& history, int server_sock, std::default_ra
     history.push_back(current_node);
 
     for (int move_count = 0;; move_count++) {
-        // printf("move_count = %d\n", move_count+1);
+        // printf("MCTS  move_count = %d\n", move_count+1);
         // TODO: tau scheduling
-        current_node = run_mcts(current_node, config.tau, server_sock, engine);
+        float tau = (move_count < config.e_step) ? config.tau : 0.0;
+        current_node = run_mcts(current_node, tau, server_sock, engine);
         // p(current_node);
         history.push_back(current_node);  // terminal node included
         if (current_node->terminal()) {
@@ -41,7 +42,7 @@ GameNode *run_mcts(GameNode *current_node, float tau, int server_sock, std::defa
 
     for (int sim_count = 0; sim_count < config.n_simulation; sim_count++) {
         GameNode* node = current_node;
-        // printf("sim_count=%d\n", sim_count);
+        // printf("MCTS  sim_count=%d\n", sim_count);
         while (node->expanded()) {  // terminal => not expanded
             // p("forward");
             // p(node);
@@ -58,10 +59,10 @@ GameNode *run_mcts(GameNode *current_node, float tau, int server_sock, std::defa
     }
 
     GameNode* next_node = current_node->next_node(tau, engine);
-    // printf("selected ( ");
+    // printf("MCTS  selected ( ");
     // for (unsigned int i = 0; i < current_node->legal_actions().size(); i++) {
     //     auto action = current_node->legal_actions()[i];
-        // std::cout << action << ":" << current_node->posteriors()[action] << " ";
+        // std::cout << "MCTS  " << action << ":" << current_node->posteriors()[action] << " ";
     // }
     // p(")");
     // p(next_node);

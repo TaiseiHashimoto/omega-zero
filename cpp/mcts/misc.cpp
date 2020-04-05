@@ -72,7 +72,8 @@ void get_exp_path(const char *prog_name, int exp_id, char *output) {
     // Assume that program is in ROOT/cpp/bin/
     char *retval = realpath(prog_name, output);
     if (retval == NULL) {
-        fprintf(stderr, "realpath error %s\n", strerror(errno));
+        fprintf(stderr, "MISC  realpath error %s\n", strerror(errno));
+        exit(-1);
     }
     char *root_path = dirname(dirname(dirname(output)));
     sprintf(output, "%s/exp/%d", root_path, exp_id);

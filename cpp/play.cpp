@@ -60,9 +60,9 @@ int main(int argc, char *argv[]) {
     std::cout << "device_id = " << device_id << std::endl;
     std::cout << "record_fname = " << record_fname << std::endl;
 
-    init_config(exp_path, generation, device_id);
+    init_config(exp_path, device_id);
     // overwrite experiment configuration
-    set_config(/*n_game=*/1, /*n_thread=*/1, n_simulation);
+    set_config(/*n_thread=*/1, n_simulation, generation);
 
     std::ofstream file(record_fname);
 

@@ -29,4 +29,5 @@ struct OmegaNetImpl : torch::nn::Module {
 TORCH_MODULE(OmegaNet);
 
 void init_model();
+int load_model(int current_generation);
 void inference(const input_t *recv_data, output_t *send_data);

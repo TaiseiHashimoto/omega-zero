@@ -47,7 +47,7 @@ void collect_mldata(int thread_id, int n_game, const char *fname) {
             auto end = std::chrono::system_clock::now();
             int elapsed = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
             float remaining = (float)(elapsed) / (i + 1) * (n_game - i - 1) / 60;
-            printf("[%3d] i=%d (%d sec)  remaining~%.2f min\n", thread_id, i, elapsed, remaining);
+            printf("[%3d] i=%d (%d sec) result=%.3f remaining~%.2f min\n", thread_id, i, elapsed, result, remaining);
         }
     }
 

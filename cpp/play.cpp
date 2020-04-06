@@ -62,7 +62,8 @@ int main(int argc, char *argv[]) {
 
     init_config(exp_path, generation, device_id);
     // overwrite experiment configuration
-    set_config(/*n_game=*/1, /*n_thread=*/1, n_simulation);
+    set_config(/*n_thread=*/1, n_simulation, /*e_frac=*/0.0);
+    const auto& config = get_config();
 
     std::ofstream file(record_fname);
 
@@ -106,7 +107,9 @@ int main(int argc, char *argv[]) {
         std::cout << "side : " << side << std::endl;
 
         if (side == comp_side) {
-            current_node = run_mcts(current_node, /*tau=*/0., server_sock, engine);
+            // TODO: exploration necessary?
+            float tau = (move_count < config.e_step) ? config.tau : 0.0;
+            current_node = run_mcts(current_node, tau, server_sock, engine);
             history.push_back(current_node);
             action = current_node->parent()->action();
             std::cout << "@ action : " << action << "\n";

@@ -123,6 +123,8 @@ class DataLoader():
     def __iter__(self):
         return self
 
+    def __len__(self):
+        return (self.total_entry + self.batch_size - 1) // self.batch_size
 
     def __next__(self):
         if self.position >= self.total_entry:

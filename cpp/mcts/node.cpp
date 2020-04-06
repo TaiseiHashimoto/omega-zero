@@ -181,23 +181,22 @@ GameNode* GameNode::next_node(float tau, std::default_random_engine& engine) {
     bool stochastic = (tau > 0.01);
     float tau_inv = stochastic ? 1.0 / tau : 1.0;
 
-    std::vector<float> ratios;
+    std::vector<float> ratios(m_children.size());
     float ratio_sum = 0;
     float ratio_max = 0;
     unsigned int ratio_max_idx = 64;
     for (unsigned int i = 0; i < m_children.size(); i++) {
-        float ratio = std::pow((float)m_children[i]->N(), tau_inv);
-        ratios.push_back(ratio);
-        ratio_sum += ratio;
-        if (ratio > ratio_max) {
-            ratio_max = ratio;
+        ratios[i] = std::pow((float)m_children[i]->N(), tau_inv);
+        ratio_sum += ratios[i];
+        if (ratios[i] > ratio_max) {
+            ratio_max = ratios[i];
             ratio_max_idx = i;
         }
     }
 
     assert(ratio_sum >= 1.0);
 
-    unsigned int selected=64;  // TODO: delete initialization
+    unsigned int selected = 64;  // TODO: delete initialization
 
     if (stochastic) {
         // select child according to visited count (ratio)
@@ -229,14 +228,11 @@ GameNode* GameNode::next_node(float tau, std::default_random_engine& engine) {
 
 void GameNode::add_exploration_noise(std::default_random_engine& engine) {
     const auto& config = get_config();
+    assert(config.d_alpha > 0);
 
     int n = m_children.size();
     std::vector<float> noise(n);
-    if (config.d_alpha == 0) {
-        std::fill(noise.begin(), noise.end(), 0);
-    } else {
-        random_dirichlet(engine, config.d_alpha, noise);
-    }
+    random_dirichlet(engine, config.d_alpha, noise);
 
     // std::cout << "noise = [";
     for (int i = 0; i < n; i++) {

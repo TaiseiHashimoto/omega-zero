@@ -16,7 +16,7 @@ struct ResBlockImpl : torch::nn::Module {
 TORCH_MODULE(ResBlock);
 
 struct OmegaNetImpl : torch::nn::Module {
-    OmegaNetImpl(int board_size, int n_action, int n_res_block, int res_filter, int head_filter, int value_hidden);
+    OmegaNetImpl(int board_size, int n_action, int n_res_block, int res_filter, int policy_filter, int value_filter, int value_hidden);
 
     std::tuple<torch::Tensor, torch::Tensor> forward(const torch::Tensor& black_board, const torch::Tensor& white_board, const torch::Tensor& side, const torch::Tensor& legal_flags);
 

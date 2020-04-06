@@ -49,6 +49,7 @@ def train(args):
     old_model_jit_path = exp_path / "model" / f"model_jit_{args.generation}.pt"
     new_model_path = exp_path / "model" / f"model_{args.generation+1}.pt"
     new_model_jit_path = exp_path / "model" / f"model_jit_{args.generation+1}.pt"
+    # optim_path = exp_path / "model" / "optim.pt"
 
     if new_model_path.exists():
         print(f"ERROR: model already exists ({new_model_path})")
@@ -62,7 +63,8 @@ def train(args):
         n_action=values["n_action"],
         n_res_block=values["n_res_block"],
         res_filter=values["res_filter"],
-        head_filter=values["head_filter"],
+        policy_filter=values["policy_filter"],
+        value_filter=values["value_filter"],
         value_hidden=values["value_hidden"]
     )
 
@@ -75,8 +77,11 @@ def train(args):
 
     omega_net.to(device)
     optim = torch.optim.AdamW(omega_net.parameters())
-    # optim = torch.optim.AdamW(omega_net.parameters(), lr=0.01)
     assert omega_net.training
+
+    # if optim_path.exists():
+    #     print(f"load optimizer {optim_path.name}")
+    #     optim.load_state_dict(torch.load(optim_path))
 
     file_paths = get_file_paths(exp_path, args.generation)
     start = time.time()
@@ -86,6 +91,8 @@ def train(args):
 
     start = time.time()
     for e in range(epoch):
+        policy_loss_avg = 0
+        value_loss_avg = 0
         for black_board_b, white_board_b, side_b, legal_flags_b, result_b, Q_b, posteriors_b in loader:
             black_board_b = black_board_b.to(device)
             white_board_b = white_board_b.to(device)
@@ -107,15 +114,19 @@ def train(args):
             loss.backward()
             optim.step()
 
+            policy_loss_avg += policy_loss.item() / len(loader)
+            value_loss_avg += value_loss.item() / len(loader)
+
         entropy = -(posteriors_b * (posteriors_b + 1e-45).log()).sum(dim=1).mean(dim=0).item()
         uniform = legal_flags_b / (legal_flags_b.sum(dim=1, keepdim=True) + 1e-8)
         loss_uni = -(posteriors_b * (uniform + 1e-45).log()).sum(dim=1).mean(dim=0).item()
         elapsed = time.time() - start
-        print(f"epoch={e+1}  ({elapsed:.2f} sec)  policy_loss={policy_loss:.3f} (entropy={entropy:.3f}, loss_uni={loss_uni:.3f}) value_loss={value_loss:.3f}")
+        print(f"epoch={e+1}  ({elapsed:.2f} sec)  policy_loss={policy_loss_avg:.3f} (entropy={entropy:.3f}, loss_uni={loss_uni:.3f}) value_loss={value_loss_avg:.3f}")
 
 
     omega_net.cpu()
     torch.save(omega_net.state_dict(), new_model_path)
+    # torch.save(optim.state_dict(), optim_path)
 
     # save model as ScriptModule (for c++)
     black_board_s = black_board_b[:1].cpu()
@@ -125,7 +136,7 @@ def train(args):
     omega_net_traced = torch.jit.trace(omega_net, (black_board_s, white_board_s, side_s, legal_flags_s))
     omega_net_traced.save(str(new_model_jit_path))
 
-    print(f"model saved! ({new_model_path.name}, {new_model_jit_path.name})")
+    print(f"save model {new_model_path.name}, {new_model_jit_path.name}")
 
     if args.generation % 5 != 0:  # delete old model
         print(f"unlink {old_model_path.name}, {old_model_jit_path.name}")

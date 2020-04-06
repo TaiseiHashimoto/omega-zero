@@ -32,7 +32,7 @@ torch::Tensor ResBlockImpl::forward(const torch::Tensor& x) {
 }
 
 
-OmegaNetImpl::OmegaNetImpl(int board_size, int n_action, int n_res_block, int res_filter, int head_filter, int value_hidden) {
+OmegaNetImpl::OmegaNetImpl(int board_size, int n_action, int n_res_block, int res_filter, int policy_filter, int value_filter, int value_hidden) {
     // input channel : black / white / side
     conv = register_module("conv", torch::nn::Sequential(
         torch::nn::Conv2d(torch::nn::Conv2dOptions(3, res_filter, 3).padding(1)),
@@ -46,19 +46,19 @@ OmegaNetImpl::OmegaNetImpl(int board_size, int n_action, int n_res_block, int re
     }
 
     policy_head = register_module("policy_head", torch::nn::Sequential(
-        torch::nn::Conv2d(torch::nn::Conv2dOptions(res_filter, head_filter, 1).padding(0)),
-        torch::nn::BatchNorm2d(head_filter),
+        torch::nn::Conv2d(torch::nn::Conv2dOptions(res_filter, policy_filter, 1).padding(0)),
+        torch::nn::BatchNorm2d(policy_filter),
         torch::nn::Flatten(),
         torch::nn::ReLU(torch::nn::ReLUOptions().inplace(true)),
-        torch::nn::Linear(head_filter * board_size * board_size, n_action)
+        torch::nn::Linear(policy_filter * board_size * board_size, n_action)
     ));
 
     value_head = register_module("value_head", torch::nn::Sequential(
-        torch::nn::Conv2d(torch::nn::Conv2dOptions(res_filter, head_filter, 1).padding(0)),
-        torch::nn::BatchNorm2d(head_filter),
+        torch::nn::Conv2d(torch::nn::Conv2dOptions(res_filter, value_filter, 1).padding(0)),
+        torch::nn::BatchNorm2d(value_filter),
         torch::nn::Flatten(),
         torch::nn::ReLU(torch::nn::ReLUOptions().inplace(true)),
-        torch::nn::Linear(head_filter * board_size * board_size, value_hidden),
+        torch::nn::Linear(value_filter * board_size * board_size, value_hidden),
         torch::nn::ReLU(torch::nn::ReLUOptions().inplace(true)),
         torch::nn::Linear(value_hidden, 1)
     ));
@@ -66,7 +66,10 @@ OmegaNetImpl::OmegaNetImpl(int board_size, int n_action, int n_res_block, int re
 
 std::tuple<torch::Tensor, torch::Tensor> OmegaNetImpl::forward(const torch::Tensor& black_board, const torch::Tensor& white_board, const torch::Tensor& side, const torch::Tensor& legal_flags) {
     torch::Tensor side_board = torch::ones_like(black_board) * side.view({-1, 1, 1});
-    torch::Tensor x = torch::stack({black_board, white_board, side_board}, 1);
+    torch::Tensor player_board = black_board * (1 - side_board) + white_board * side_board;
+    torch::Tensor opponent_board = black_board * side_board + white_board * (1 - side_board);
+
+    torch::Tensor x = torch::stack({player_board, opponent_board}, 1);
     x = res_blocks->forward(conv->forward(x));
 
     torch::Tensor policy_logit = policy_head->forward(x);
@@ -93,9 +96,9 @@ void init_model() {
     }
     std::cout << "using " << device << std::endl;
 
-    omega_net = OmegaNet(config.board_size, config.n_action, config.n_res_block, config.res_filter, config.head_filter, config.value_hidden);
+    omega_net = OmegaNet(config.board_size, config.n_action, config.n_res_block, config.res_filter, config.policy_filter, config.value_filter, config.value_hidden);
     try {
-        printf("load model %s\n", config.model_fname);
+        printf("load model %s\n", basename(config.model_fname));
         torch::load(omega_net, config.model_fname);
     } catch (const c10::Error& e) {
         fprintf(stderr, "error loading the model\n");

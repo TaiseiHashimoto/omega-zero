@@ -47,9 +47,10 @@ void init_config(const char *exp_path, int generation, int device_id) {
     config.n_action = (int)obj["n_action"].get<double>();
     config.n_res_block = (int)obj["n_res_block"].get<double>();
     config.res_filter = (int)obj["res_filter"].get<double>();
-    config.head_filter = (int)obj["head_filter"].get<double>();
+    config.policy_filter = (int)obj["policy_filter"].get<double>();
+    config.value_filter = (int)obj["value_filter"].get<double>();
     config.value_hidden = (int)obj["value_hidden"].get<double>();
-    // printf("board_size=%d n_action=%d n_res_block=%d res_filter=%d head_filter=%d value_hidden=%d\n", config.board_size, config.n_action, config.n_res_block, config.res_filter, config.head_filter, config.value_hidden);
+    // printf("board_size=%d n_action=%d n_res_block=%d res_filter=%d value_hidden=%d\n", config.board_size, config.n_action, config.n_res_block, config.res_filter, config.value_hidden);
 
     config.n_game = (int)obj["n_game"].get<double>();
     config.n_thread = (int)obj["n_thread"].get<double>();
@@ -65,8 +66,8 @@ const config_t& get_config() {
     return config;
 }
 
-void set_config(int n_game, int n_thread, int n_simulation) {
-    config.n_game = n_game;
+void set_config(int n_thread, int n_simulation, float e_frac) {
     config.n_thread = n_thread;
     config.n_simulation = n_simulation;
+    config.e_frac = e_frac;
 }

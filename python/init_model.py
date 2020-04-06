@@ -21,23 +21,24 @@ if __name__ == '__main__':
     # print(f"new_model_jit_path={new_model_jit_path}")
 
     with open(config_path, "r") as f:
-        values = json.load(f)
+        config = json.load(f)
 
     omega_net = OmegaNet(
-        board_size=values["board_size"],
-        n_action=values["n_action"],
-        n_res_block=values["n_res_block"],
-        res_filter=values["res_filter"],
-        head_filter=values["head_filter"],
-        value_hidden=values["value_hidden"]
+        board_size=config["board_size"],
+        n_action=config["n_action"],
+        n_res_block=config["n_res_block"],
+        res_filter=config["res_filter"],
+        policy_filter=config["policy_filter"],
+        value_filter=config["value_filter"],
+        value_hidden=config["value_hidden"]
     )
 
     torch.save(omega_net.state_dict(), new_model_path)
 
-    black_board_dummy = torch.rand(1, values["board_size"], values["board_size"])
-    white_board_dummy = torch.rand(1, values["board_size"], values["board_size"])
+    black_board_dummy = torch.rand(1, config["board_size"], config["board_size"])
+    white_board_dummy = torch.rand(1, config["board_size"], config["board_size"])
     side_dummy = torch.rand(1)
-    legal_flags_dummy = torch.rand(1, values["n_action"])
+    legal_flags_dummy = torch.rand(1, config["n_action"])
 
     omega_net_jit = torch.jit.trace(omega_net, (black_board_dummy, white_board_dummy, side_dummy, legal_flags_dummy))
     omega_net_jit.save(str(new_model_jit_path))

@@ -21,12 +21,12 @@ class ResBlock(nn.Module):
 
 
 class OmegaNet(nn.Module):
-    def __init__(self, board_size, n_action, n_res_block, res_filter, head_filter, value_hidden):
+    def __init__(self, board_size, n_action, n_res_block, res_filter, policy_filter, value_filter, value_hidden):
         super().__init__()
 
-        # input channel : black / white / side
+        # input channel : player / opponent
         self.conv = nn.Sequential(
-            nn.Conv2d(3, res_filter, kernel_size=3, padding=1),
+            nn.Conv2d(2, res_filter, kernel_size=3, padding=1),
             nn.BatchNorm2d(res_filter),
             nn.ReLU(inplace=True)
         )
@@ -34,26 +34,30 @@ class OmegaNet(nn.Module):
         self.res_blocks = nn.Sequential(*[ResBlock(res_filter) for i in range(n_res_block)])
 
         self.policy_head = nn.Sequential(
-            nn.Conv2d(res_filter, head_filter, kernel_size=1, padding=0),
-            nn.BatchNorm2d(head_filter),
+            nn.Conv2d(res_filter, policy_filter, kernel_size=1, padding=0),
+            nn.BatchNorm2d(policy_filter),
             nn.Flatten(),
             nn.ReLU(inplace=True),
-            nn.Linear(head_filter * board_size ** 2, n_action)
+            nn.Linear(policy_filter * board_size ** 2, n_action)
         )
 
         self.value_head = nn.Sequential(
-            nn.Conv2d(res_filter, head_filter, kernel_size=1, padding=0),
-            nn.BatchNorm2d(head_filter),
+            nn.Conv2d(res_filter, value_filter, kernel_size=1, padding=0),
+            nn.BatchNorm2d(value_filter),
             nn.Flatten(),
             nn.ReLU(inplace=True),
-            nn.Linear(head_filter * board_size ** 2, value_hidden),
+            nn.Linear(value_filter * board_size ** 2, value_hidden),
             nn.ReLU(inplace=True),
             nn.Linear(value_hidden, 1)
         )
 
     def forward(self, black_board, white_board, side, legal_flags):
         side_board = torch.ones_like(black_board) * side[:, None, None]
-        x = torch.stack([black_board, white_board, side_board], dim=1)
+
+        player_board = black_board * (1 - side_board) + white_board * side_board
+        opponent_board = black_board * side_board + white_board * (1 - side_board)
+
+        x = torch.stack([player_board, opponent_board], dim=1)
         x = self.res_blocks(self.conv(x))
 
         policy_logit = self.policy_head(x)

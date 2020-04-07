@@ -56,27 +56,27 @@ def train(args):
         exit(-1)
 
     with open(config_path, "r") as f:
-        values = json.load(f)
+        config = json.load(f)
 
     omega_net = OmegaNet(
-        board_size=values["board_size"],
-        n_action=values["n_action"],
-        n_res_block=values["n_res_block"],
-        res_filter=values["res_filter"],
-        policy_filter=values["policy_filter"],
-        value_filter=values["value_filter"],
-        value_hidden=values["value_hidden"]
+        board_size=config["board_size"],
+        n_action=config["n_action"],
+        n_res_block=config["n_res_block"],
+        res_filter=config["res_filter"],
+        policy_filter=config["policy_filter"],
+        value_filter=config["value_filter"],
+        value_hidden=config["value_hidden"]
     )
 
-    epoch = values["epoch"]
-    batch_size = values["batch_size"]
+    epoch = config["epoch"]
+    batch_size = config["batch_size"]
 
     # load latest model
     omega_net.load_state_dict(torch.load(old_model_path))
     print(f"load {old_model_path.name}")
 
     omega_net.to(device)
-    optim = torch.optim.AdamW(omega_net.parameters())
+    optim = torch.optim.AdamW(omega_net.parameters(), weight_decay=config["weight_decay"])
     assert omega_net.training
 
     # if optim_path.exists():
@@ -89,10 +89,13 @@ def train(args):
     elapsed = time.time() - start
     print(f"load time : {elapsed:.2f} sec")
 
+    n_batch = len(loader)
     start = time.time()
     for e in range(epoch):
         policy_loss_avg = 0
         value_loss_avg = 0
+        entropy_avg = 0
+        # loss_uni_avg = 0
         for black_board_b, white_board_b, side_b, legal_flags_b, result_b, Q_b, posteriors_b in loader:
             black_board_b = black_board_b.to(device)
             white_board_b = white_board_b.to(device)
@@ -114,14 +117,15 @@ def train(args):
             loss.backward()
             optim.step()
 
-            policy_loss_avg += policy_loss.item() / len(loader)
-            value_loss_avg += value_loss.item() / len(loader)
+            with torch.no_grad():
+                policy_loss_avg += policy_loss.item() / n_batch
+                value_loss_avg += value_loss.item() / n_batch
+                entropy_avg += -(posteriors_b * (posteriors_b + 1e-45).log()).sum(dim=1).mean(dim=0).item() / n_batch
+                # uniform = legal_flags_b / (legal_flags_b.sum(dim=1, keepdim=True) + 1e-8)
+                # loss_uni_avg += -(posteriors_b * (uniform + 1e-45).log()).sum(dim=1).mean(dim=0).item() / len(loader)
 
-        entropy = -(posteriors_b * (posteriors_b + 1e-45).log()).sum(dim=1).mean(dim=0).item()
-        uniform = legal_flags_b / (legal_flags_b.sum(dim=1, keepdim=True) + 1e-8)
-        loss_uni = -(posteriors_b * (uniform + 1e-45).log()).sum(dim=1).mean(dim=0).item()
         elapsed = time.time() - start
-        print(f"epoch={e+1}  ({elapsed:.2f} sec)  policy_loss={policy_loss_avg:.3f} (entropy={entropy:.3f}, loss_uni={loss_uni:.3f}) value_loss={value_loss_avg:.3f}")
+        print(f"epoch={e+1}  ({elapsed:.2f} sec)  policy_loss={policy_loss_avg:.3f} (entropy={entropy_avg:.3f}) value_loss={value_loss_avg:.3f}")
 
 
     omega_net.cpu()

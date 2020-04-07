@@ -7,11 +7,11 @@ class ResBlock(nn.Module):
     def __init__(self, n_filter):
         super().__init__()
 
-        self.conv1 = nn.Conv2d(n_filter, n_filter, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(n_filter, n_filter, kernel_size=3, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(n_filter)
-        self.conv2 = nn.Conv2d(n_filter, n_filter, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(n_filter, n_filter, kernel_size=3, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(n_filter)
-    
+
     def forward(self, x):
         identity = x
         x = F.relu(self.bn1(self.conv1(x)))
@@ -26,7 +26,7 @@ class OmegaNet(nn.Module):
 
         # input channel : player / opponent
         self.conv = nn.Sequential(
-            nn.Conv2d(2, res_filter, kernel_size=3, padding=1),
+            nn.Conv2d(2, res_filter, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(res_filter),
             nn.ReLU(inplace=True)
         )
@@ -34,7 +34,7 @@ class OmegaNet(nn.Module):
         self.res_blocks = nn.Sequential(*[ResBlock(res_filter) for i in range(n_res_block)])
 
         self.policy_head = nn.Sequential(
-            nn.Conv2d(res_filter, policy_filter, kernel_size=1, padding=0),
+            nn.Conv2d(res_filter, policy_filter, kernel_size=1, padding=0, bias=False),
             nn.BatchNorm2d(policy_filter),
             nn.Flatten(),
             nn.ReLU(inplace=True),
@@ -42,7 +42,7 @@ class OmegaNet(nn.Module):
         )
 
         self.value_head = nn.Sequential(
-            nn.Conv2d(res_filter, value_filter, kernel_size=1, padding=0),
+            nn.Conv2d(res_filter, value_filter, kernel_size=1, padding=0, bias=False),
             nn.BatchNorm2d(value_filter),
             nn.Flatten(),
             nn.ReLU(inplace=True),

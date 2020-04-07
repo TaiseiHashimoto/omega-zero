@@ -13,11 +13,11 @@
 
 ResBlockImpl::ResBlockImpl(int n_filter) {
     conv1 = register_module("conv1", torch::nn::Conv2d(
-        torch::nn::Conv2dOptions(n_filter, n_filter, 3).padding(1)
+        torch::nn::Conv2dOptions(n_filter, n_filter, 3).padding(1).bias(false)
     ));
     bn1 = register_module("bn1", torch::nn::BatchNorm2d(n_filter));
     conv2 = register_module("conv2", torch::nn::Conv2d(
-        torch::nn::Conv2dOptions(n_filter, n_filter, 3).padding(1)
+        torch::nn::Conv2dOptions(n_filter, n_filter, 3).padding(1).bias(false)
     ));
     bn2 = register_module("bn2", torch::nn::BatchNorm2d(n_filter));
 }
@@ -35,7 +35,7 @@ torch::Tensor ResBlockImpl::forward(const torch::Tensor& x) {
 OmegaNetImpl::OmegaNetImpl(int board_size, int n_action, int n_res_block, int res_filter, int policy_filter, int value_filter, int value_hidden) {
     // input channel : black / white / side
     conv = register_module("conv", torch::nn::Sequential(
-        torch::nn::Conv2d(torch::nn::Conv2dOptions(3, res_filter, 3).padding(1)),
+        torch::nn::Conv2d(torch::nn::Conv2dOptions(3, res_filter, 3).padding(1).bias(false)),
         torch::nn::BatchNorm2d(res_filter),
         torch::nn::ReLU(torch::nn::ReLUOptions().inplace(true))
     ));
@@ -46,7 +46,7 @@ OmegaNetImpl::OmegaNetImpl(int board_size, int n_action, int n_res_block, int re
     }
 
     policy_head = register_module("policy_head", torch::nn::Sequential(
-        torch::nn::Conv2d(torch::nn::Conv2dOptions(res_filter, policy_filter, 1).padding(0)),
+        torch::nn::Conv2d(torch::nn::Conv2dOptions(res_filter, policy_filter, 1).padding(0).bias(false)),
         torch::nn::BatchNorm2d(policy_filter),
         torch::nn::Flatten(),
         torch::nn::ReLU(torch::nn::ReLUOptions().inplace(true)),
@@ -54,7 +54,7 @@ OmegaNetImpl::OmegaNetImpl(int board_size, int n_action, int n_res_block, int re
     ));
 
     value_head = register_module("value_head", torch::nn::Sequential(
-        torch::nn::Conv2d(torch::nn::Conv2dOptions(res_filter, value_filter, 1).padding(0)),
+        torch::nn::Conv2d(torch::nn::Conv2dOptions(res_filter, value_filter, 1).padding(0).bias(false)),
         torch::nn::BatchNorm2d(value_filter),
         torch::nn::Flatten(),
         torch::nn::ReLU(torch::nn::ReLUOptions().inplace(true)),
@@ -101,7 +101,7 @@ void init_model() {
         printf("load model %s\n", basename(config.model_fname));
         torch::load(omega_net, config.model_fname);
     } catch (const c10::Error& e) {
-        fprintf(stderr, "error loading the model\n");
+        fprintf(stderr, "error loading the model %s\n", config.model_fname);
         exit(-1);
     }
     omega_net->to(device);

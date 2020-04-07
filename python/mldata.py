@@ -35,7 +35,7 @@ class DataLoader():
             bu_path = file_path.with_suffix(".pt")
 
             if bu_path.exists():  # use backup
-                print(f"load {file_path.name} from backup")
+                print(f"load {file_path.name} from backup", end="  ")
                 data = torch.load(bu_path)
                 black_board_file = data["black_board"]
                 white_board_file = data["white_board"]
@@ -45,7 +45,7 @@ class DataLoader():
                 Q_file = data["Q"]
                 posteriors_file = data["posteriors"]
             else:
-                print(f"load {file_path.name} from data file")
+                print(f"load {file_path.name} from data file", end="  ")
                 black_bitboard_file = []
                 white_bitboard_file = []
                 side_file = []

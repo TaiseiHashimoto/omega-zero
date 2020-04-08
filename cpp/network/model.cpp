@@ -84,8 +84,47 @@ std::tuple<torch::Tensor, torch::Tensor> OmegaNetImpl::forward(const torch::Tens
 
 
 namespace {
-    torch::Device device{torch::kCPU};
-    OmegaNet omega_net{nullptr};
+
+torch::Device device{torch::kCPU};
+OmegaNet omega_net{nullptr};
+torch::Tensor position_board;
+
+torch::Tensor make_all_variations(const torch::Tensor& board) {
+    return torch::stack({
+        board,
+        board.flip(1),
+        board.flip(2),
+        board.permute({0, 2, 1}),
+        board.flip(1).permute({0, 2, 1}).flip(1),
+        torch::rot90(board, 1, {1, 2}),
+        torch::rot90(board, 2, {1, 2}),
+        torch::rot90(board, 3, {1, 2})
+    }, /*dim=*/0);
+}
+
+torch::Tensor make_variation(const torch::Tensor& board, const torch::Tensor& norm_idx) {
+    torch::Tensor board_vars = make_all_variations(board);
+    torch::Tensor batch_range = torch::arange(board.size(0));
+    return torch::index(board_vars, {norm_idx, batch_range});
+}
+
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> normalize_board(const torch::Tensor& black_board, const torch::Tensor& white_board) {
+    torch::Tensor black_board_vars = make_all_variations(black_board);
+    torch::Tensor white_board_vars = make_all_variations(white_board);
+
+    torch::Tensor score = ((black_board_vars + white_board_vars) * position_board).sum(-1).sum(-1);
+    torch::Tensor norm_idx = torch::argmax(score, /*dim=*/0);
+
+    torch::Tensor batch_range = torch::arange(black_board.size(0));
+    return std::make_tuple(torch::index(black_board_vars, {norm_idx, batch_range}), torch::index(white_board_vars, {norm_idx, batch_range}), norm_idx);
+}
+
+torch::Tensor flip_idx(const torch::Tensor& norm_idx) {
+    torch::Tensor idx5 = (norm_idx == 5).nonzero().view({-1});
+    torch::Tensor idx7 = (norm_idx == 7).nonzero().view({-1});
+    return norm_idx.index_fill(0, idx5, 7).index_fill(0, idx7, 5);
+}
+
 }
 
 void init_model() {
@@ -106,6 +145,8 @@ void init_model() {
     }
     omega_net->to(device);
     omega_net->eval();
+
+    position_board = torch::linspace(0., 1., 64).view({8, 8}).to(device);
 }
 
 void inference(const input_t *recv_data, output_t *send_data) {
@@ -129,11 +170,18 @@ void inference(const input_t *recv_data, output_t *send_data) {
     torch::Tensor side_b = torch::from_blob(side_arr, {config.n_thread}).to(device);
     torch::Tensor legal_flags_b = torch::from_blob(legal_flags_arr, {config.n_thread, 64}).to(device);
 
+    // normalize board direction
+    torch::Tensor norm_idx;
+    std::tie(black_board_b, white_board_b, norm_idx) = normalize_board(black_board_b, white_board_b);
+    legal_flags_b = make_variation(legal_flags_b.view({-1, 8, 8}), norm_idx).view({-1, 64});
+
     torch::Tensor policy_b, value_pred_b;
     {
         torch::NoGradGuard no_grad;
         std::tie(policy_b, value_pred_b) = omega_net->forward(black_board_b, white_board_b, side_b, legal_flags_b);
     }
+
+    policy_b = make_variation(policy_b.view({-1, 8, 8}), flip_idx(norm_idx)).view({-1, 64});
 
     policy_b = policy_b.to(torch::kCPU);
     value_pred_b = value_pred_b.to(torch::kCPU);

@@ -16,6 +16,37 @@ class Entry(ctypes.Structure):
     ]
 
 
+def make_all_variations(board):
+    return torch.stack([
+        board,
+        board.flip(1),
+        board.flip(2),
+        board.permute(0, 2, 1),
+        board.flip(1).permute(0, 2, 1).flip(1),
+        torch.rot90(board, 1, (1, 2)),
+        torch.rot90(board, 2, (1, 2)),
+        torch.rot90(board, 3, (1, 2)),
+    ], dim=0)
+
+
+def make_variation(board, norm_idx):
+    board_vars = make_all_variations(board)
+    return board_vars[norm_idx, range(len(board))]
+
+
+def normalize_input(black_board, white_board):
+    position_board = torch.linspace(0, 1, 64).view(8, 8)
+    black_board_vars = make_all_variations(black_board)
+    white_board_vars = make_all_variations(white_board)
+
+    score = ((black_board_vars + white_board_vars) * position_board).sum(dim=(-1, -2))
+    norm_idx = torch.argmax(score, dim=0)
+
+    batch_range = torch.arange(len(black_board))
+    return black_board_vars[norm_idx, batch_range], white_board_vars[norm_idx, batch_range], norm_idx
+
+
+
 class DataLoader():
     def __init__(self, file_paths, batch_size):
         self.file_paths = file_paths
@@ -84,6 +115,11 @@ class DataLoader():
                 result_file = torch.tensor(result_file, dtype=torch.float)
                 Q_file = torch.tensor(Q_file, dtype=torch.float)
                 posteriors_file = torch.tensor(posteriors_file, dtype=torch.float)
+
+                # normalize board direction
+                black_board_file, white_board_file, norm_idx = normalize_input(black_board_file, white_board_file)
+                legal_flags_file = make_variation(legal_flags_file.view(-1, 8, 8), norm_idx).view(-1, 64)
+                posteriors_file = make_variation(posteriors_file.view(-1, 8, 8), norm_idx).view(-1, 64)
 
                 torch.save({
                     "black_board": black_board_file,

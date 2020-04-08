@@ -76,7 +76,7 @@ def train(args):
     print(f"load {old_model_path.name}")
 
     omega_net.to(device)
-    optim = torch.optim.AdamW(omega_net.parameters(), weight_decay=config["weight_decay"])
+    optim = torch.optim.AdamW(omega_net.parameters(), lr=0.01, weight_decay=config["weight_decay"])
     assert omega_net.training
 
     # if optim_path.exists():

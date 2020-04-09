@@ -24,9 +24,9 @@ class OmegaNet(nn.Module):
     def __init__(self, board_size, n_action, n_res_block, res_filter, policy_filter, value_filter, value_hidden):
         super().__init__()
 
-        # input channel : player / opponent
+        # input channel : black / white / side
         self.conv = nn.Sequential(
-            nn.Conv2d(2, res_filter, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(3, res_filter, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(res_filter),
             nn.ReLU(inplace=True)
         )
@@ -53,11 +53,7 @@ class OmegaNet(nn.Module):
 
     def forward(self, black_board, white_board, side, legal_flags):
         side_board = torch.ones_like(black_board) * side[:, None, None]
-
-        player_board = black_board * (1 - side_board) + white_board * side_board
-        opponent_board = black_board * side_board + white_board * (1 - side_board)
-
-        x = torch.stack([player_board, opponent_board], dim=1)
+        x = torch.stack([black_board, white_board, side_board], dim=1)
         x = self.res_blocks(self.conv(x))
 
         policy_logit = self.policy_head(x)

@@ -91,7 +91,7 @@ namespace {
 void init_model() {
     const auto& config = get_config();
 
-    if (torch::cuda::is_available()) {
+    if (torch::cuda::is_available() && config.device_id >= 0) {
         device = {torch::kCUDA, (short int)config.device_id};
     }
     std::cout << "using " << device << std::endl;

@@ -75,4 +75,4 @@ if __name__ == '__main__':
         delta1 = datetime.datetime.now() - start_time
         remaining_sec = delta1.total_seconds() * (end_generation-generation-1) / (generation-start_generation+1)
         delta2 = datetime.timedelta(seconds=remaining_sec)
-        print(f"\nelapsed time: {delta1}  reamaining time: {delta2}\n")
+        print(f"\nelapsed time: {delta1}  remaining time: {delta2}\n")

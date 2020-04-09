@@ -70,8 +70,8 @@ class DataLoader():
                         # posteriors[posteriors_st.argmax()] = 1.0
                         posteriors_file.append(np.ctypeslib.as_array(entry.posteriors).copy())
 
-                black_bitboard_file = np.array(black_bitboard_file).astype(np.uint64)
-                white_bitboard_file = np.array(white_bitboard_file).astype(np.uint64)
+                black_bitboard_file = np.array(black_bitboard_file, dtype=np.uint64)
+                white_bitboard_file = np.array(white_bitboard_file, dtype=np.uint64)
                 black_board_flat_file = (black_bitboard_file[:, None] & self.pos_binary > 0).astype(np.float32)
                 white_board_flat_file = (white_bitboard_file[:, None] & self.pos_binary > 0).astype(np.float32)
                 black_board_file = black_board_flat_file.reshape((-1, 8, 8))

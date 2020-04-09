@@ -67,7 +67,7 @@ void run_server(int pipe_fd) {
 
     std::vector<int> client_socks(config.n_thread);
     int listen_sock = connect_to_clients(pipe_fd, client_socks);
-    printf("accepted %d clients\n", config.n_thread);
+    // printf("accepted %d clients\n", config.n_thread);
 
     // initialization for select()
     int maxfd = 0;

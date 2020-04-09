@@ -10,12 +10,12 @@ from model import OmegaNet
 from mldata import DataLoader
 
 
-def get_window_size(generation, max_size=20, ratio=0.6):
-    return min(int(np.ceil((generation+1) * ratio)), max_size)
+def get_window_size(generation, window_size_max, ratio=0.6):
+    return min(int(np.ceil((generation+1) * ratio)), window_size_max)
 
 
-def get_file_paths(exp_path, generation, delete_old=True):
-    window_size = get_window_size(generation)
+def get_file_paths(exp_path, generation, window_size_max, delete_old=True):
+    window_size = get_window_size(generation, window_size_max)
     print(f"window_size = {window_size}")
 
     file_paths = []
@@ -68,9 +68,6 @@ def train(args):
         value_hidden=config["value_hidden"]
     )
 
-    epoch = config["epoch"]
-    batch_size = config["batch_size"]
-
     # load latest model
     omega_net.load_state_dict(torch.load(old_model_path))
     print(f"load {old_model_path.name}")
@@ -83,15 +80,15 @@ def train(args):
     #     print(f"load optimizer {optim_path.name}")
     #     optim.load_state_dict(torch.load(optim_path))
 
-    file_paths = get_file_paths(exp_path, args.generation)
+    file_paths = get_file_paths(exp_path, args.generation, config["window_size_max"])
     start = time.time()
-    loader = DataLoader(file_paths, batch_size)
+    loader = DataLoader(file_paths, config["batch_size"])
     elapsed = time.time() - start
     print(f"load time : {elapsed:.2f} sec")
 
     n_batch = len(loader)
     start = time.time()
-    for e in range(epoch):
+    for e in range(config["epoch"]):
         policy_loss_avg = 0
         value_loss_avg = 0
         entropy_avg = 0

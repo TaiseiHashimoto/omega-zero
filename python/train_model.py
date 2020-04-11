@@ -82,7 +82,7 @@ def train(args):
 
     file_paths = get_file_paths(exp_path, args.generation, config["window_size_max"])
     start = time.time()
-    loader = DataLoader(file_paths, config["batch_size"])
+    loader = DataLoader(file_paths, config["batch_size"], config["augmentation"], config["unique"])
     elapsed = time.time() - start
     print(f"load time : {elapsed:.2f} sec")
 
@@ -118,8 +118,6 @@ def train(args):
                 policy_loss_avg += policy_loss.item() / n_batch
                 value_loss_avg += value_loss.item() / n_batch
                 entropy_avg += -(posteriors_b * (posteriors_b + 1e-45).log()).sum(dim=1).mean(dim=0).item() / n_batch
-                # uniform = legal_flags_b / (legal_flags_b.sum(dim=1, keepdim=True) + 1e-8)
-                # loss_uni_avg += -(posteriors_b * (uniform + 1e-45).log()).sum(dim=1).mean(dim=0).item() / len(loader)
 
         elapsed = time.time() - start
         print(f"epoch={e+1}  ({elapsed:.2f} sec)  policy_loss={policy_loss_avg:.3f} (entropy={entropy_avg:.3f}) value_loss={value_loss_avg:.3f}")

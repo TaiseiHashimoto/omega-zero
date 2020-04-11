@@ -107,7 +107,6 @@ int main(int argc, char *argv[]) {
         std::cout << "side : " << side << std::endl;
 
         if (side == comp_side) {
-            // TODO: exploration necessary?
             float tau = (move_count < config.e_step) ? config.tau : 0.0;
             current_node = run_mcts(current_node, tau, server_sock, engine);
             history.push_back(current_node);

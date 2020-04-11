@@ -16,8 +16,21 @@ class Entry(ctypes.Structure):
     ]
 
 
+def make_variations(board):
+    return np.stack([
+        board,
+        np.flip(board, axis=1),
+        np.flip(board, axis=2),
+        np.transpose(board, (0, 2, 1)),
+        np.flip(np.transpose(np.flip(board, axis=1), (0, 2, 1)), axis=1),
+        np.rot90(board, 1, (1, 2)),
+        np.rot90(board, 2, (1, 2)),
+        np.rot90(board, 3, (1, 2)),
+    ], axis=1)
+
+
 class DataLoader():
-    def __init__(self, file_paths, batch_size):
+    def __init__(self, file_paths, batch_size, augmentation, unique):
         self.file_paths = file_paths
         self.batch_size = batch_size
         self.entry_size = ctypes.sizeof(Entry)
@@ -55,7 +68,6 @@ class DataLoader():
                 posteriors_file = []
                 with open(file_path, "rb") as file:
                     entry = Entry()
-                    # print(f"load data from {file_path}")
                     while file.readinto(entry):
                         black_bitboard_file.append(entry.black_bitboard)
                         white_bitboard_file.append(entry.white_bitboard)
@@ -63,22 +75,56 @@ class DataLoader():
                         legal_flags_file.append(np.ctypeslib.as_array(entry.legal_flags).copy())
                         result_file.append(entry.result)
                         Q_file.append(entry.Q)
-                        # TODO: how to set policy target? (tau=0)
-                        # posteriors = np.ctypeslib.as_array(entry.posteriors)
-                        # posteriors_st = np.ctypeslib.as_array(entry.posteriors)
-                        # posteriors = np.zeros_like(posteriors_st)
-                        # posteriors[posteriors_st.argmax()] = 1.0
                         posteriors_file.append(np.ctypeslib.as_array(entry.posteriors).copy())
 
                 black_bitboard_file = np.array(black_bitboard_file, dtype=np.uint64)
                 white_bitboard_file = np.array(white_bitboard_file, dtype=np.uint64)
+                side_file = np.array(side_file, dtype=np.float32)
+                legal_flags_file = np.array(legal_flags_file, dtype=np.float32)
+                result_file = np.array(result_file, dtype=np.float32)
+                Q_file = np.array(Q_file, dtype=np.float32)
+                posteriors_file = np.array(posteriors_file, dtype=np.float32)
+
                 black_board_flat_file = (black_bitboard_file[:, None] & self.pos_binary > 0).astype(np.float32)
                 white_board_flat_file = (white_bitboard_file[:, None] & self.pos_binary > 0).astype(np.float32)
                 black_board_file = black_board_flat_file.reshape((-1, 8, 8))
                 white_board_file = white_board_flat_file.reshape((-1, 8, 8))
 
-                black_board_file = torch.tensor(black_board_file)
-                white_board_file = torch.tensor(white_board_file)
+                if augmentation:
+                    black_board_file = make_variations(black_board_file).reshape((-1, 8, 8))
+                    white_board_file = make_variations(white_board_file).reshape((-1, 8, 8))
+                    side_file = side_file.repeat(8, axis=0)
+                    legal_flags_file = make_variations(legal_flags_file.reshape((-1, 8, 8))).reshape((-1, 64))
+                    result_file = result_file.repeat(8, axis=0)
+                    Q_file = Q_file.repeat(8, axis=0)
+                    posteriors_file = make_variations(posteriors_file.reshape((-1, 8, 8))).reshape((-1, 64))
+
+                if unique:
+                    # subtraction is bijective here
+                    state_file = (black_board_file - white_board_file).reshape((-1, 64)) * (1 - side_file[:, None]*2)
+                    state_file_unq, unq_idxs = np.unique(state_file, axis=0, return_index=True)
+                    print(f"unique {len(black_board_file)} -> {len(unq_idxs)}")
+
+                    black_board_file = black_board_file[unq_idxs]
+                    white_board_file = white_board_file[unq_idxs]
+                    side_file = side_file[unq_idxs]
+                    legal_flags_file = legal_flags_file[unq_idxs]
+
+                    # take average
+                    result_file_avg = []
+                    Q_file_avg = []
+                    posteriors_file_avg = []
+                    for s in state_file_unq:
+                        idxs = (state_file == s).all(axis=1).nonzero()[0]
+                        result_file_avg.append(result_file[idxs].mean(axis=0))
+                        Q_file_avg.append(Q_file[idxs].mean(axis=0))
+                        posteriors_file_avg.append(posteriors_file[idxs].mean(axis=0))
+                    result_file = np.array(result_file_avg)
+                    Q_file = np.array(Q_file_avg)
+                    posteriors_file = np.array(posteriors_file_avg)
+
+                black_board_file = torch.tensor(black_board_file, dtype=torch.float)
+                white_board_file = torch.tensor(white_board_file, dtype=torch.float)
                 side_file = torch.tensor(side_file, dtype=torch.float)
                 legal_flags_file = torch.tensor(legal_flags_file, dtype=torch.float)
                 result_file = torch.tensor(result_file, dtype=torch.float)

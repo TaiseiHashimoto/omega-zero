@@ -262,7 +262,12 @@ std::ostream& operator<<(std::ostream& os, const GameNode& node) {
                     return children[idx1]->prior() > children[idx2]->prior();
                 });
             for (int idx : idxs) {
-                os << node.legal_actions()[idx] << "(" << children[idx]->prior() << ") ";
+                os << node.legal_actions()[idx] << "("
+                    // << children[idx]->side() << ","
+                    << children[idx]->prior() << ","
+                    // << children[idx]->Q() << ","
+                    // << children[idx]->value() << ","
+                    << children[idx]->N() << ") ";
             }
         } else {
             os << "pass ";

@@ -1,5 +1,5 @@
 # OmegaZero
-Othello AI using AlphaZero algorithm
+Othello AI with AlphaZero algorithm
 
 ## Environment
 - c++ 17
@@ -9,8 +9,8 @@ Othello AI using AlphaZero algorithm
 
 ## Build
 In cpp directory  
-`mkdir build && cd build`
-`cmake -DCMAKE_PREFIX_PATH=/absolute/path/to/libtorch ..`
+`mkdir build && cd build`  
+`cmake -DCMAKE_PREFIX_PATH=/absolute/path/to/libtorch ..`  
 `cmake --build .`
 
 ## Play games
@@ -19,15 +19,14 @@ In build directory
 
 ## Features
 - Self-play
-    - c++ (with libtorch)
+    - c++ (libtorch)
     - multi-thread data generation
     - efficient computation by client / server system  
       (clients request state evaluations & server responds with neural network outputs)
 
 - Model training
-    - python (with pytorch)
-
-- Modification from AlphaZero
-    - Instead of providing the neural network with side (black / white) channel, I swapped the boards according to the side.
-    - much less training (due to computational power limit and simplicity of the game)
-    - some hyper parameters changed
+    - python (pytorch)
+    - providing player's board and opponent's board as input  
+      (instead of providing black board, white board and color board)
+    - data augmentation (x8, flip & rotation)
+    - remove duplication

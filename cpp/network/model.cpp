@@ -33,9 +33,9 @@ torch::Tensor ResBlockImpl::forward(const torch::Tensor& x) {
 
 
 OmegaNetImpl::OmegaNetImpl(int board_size, int n_action, int n_res_block, int res_filter, int policy_filter, int value_filter, int value_hidden) {
-    // input channel : black / white / side
+    // input channel : player's board, opponent's board
     conv = register_module("conv", torch::nn::Sequential(
-        torch::nn::Conv2d(torch::nn::Conv2dOptions(3, res_filter, 3).padding(1).bias(false)),
+        torch::nn::Conv2d(torch::nn::Conv2dOptions(2, res_filter, 3).padding(1).bias(false)),
         torch::nn::BatchNorm2d(res_filter),
         torch::nn::ReLU(torch::nn::ReLUOptions().inplace(true))
     ));
@@ -65,8 +65,10 @@ OmegaNetImpl::OmegaNetImpl(int board_size, int n_action, int n_res_block, int re
 }
 
 std::tuple<torch::Tensor, torch::Tensor> OmegaNetImpl::forward(const torch::Tensor& black_board, const torch::Tensor& white_board, const torch::Tensor& side, const torch::Tensor& legal_flags) {
-    torch::Tensor side_board = torch::ones_like(black_board) * side.view({-1, 1, 1});
-    torch::Tensor x = torch::stack({black_board, white_board, side_board}, 1);
+    torch::Tensor side_board = side.view({-1, 1, 1});
+    torch::Tensor player_board = black_board * (1 - side_board) + white_board * side_board;
+    torch::Tensor opponent_board = black_board * side_board + white_board * (1 - side_board);
+    torch::Tensor x = torch::stack({player_board, opponent_board}, 1);
     x = res_blocks->forward(conv->forward(x));
 
     torch::Tensor policy_logit = policy_head->forward(x);

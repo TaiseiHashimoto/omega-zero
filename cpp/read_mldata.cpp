@@ -46,7 +46,8 @@ int main(int argc, char const *argv[])
             sum += posterior;
         }
         std::cout << "\nsum=" << sum << std::endl;
-
+        std::cout << "black:" << board.count(CellState::BLACK)
+                    << " white:" << board.count(CellState::WHITE) << "\n\n";
         i++;
         if (i == limit) {
             break;

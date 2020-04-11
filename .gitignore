@@ -14,3 +14,4 @@ record*.txt
 log*.txt
 *.lprof
 exp/
+analyze.*

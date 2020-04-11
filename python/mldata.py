@@ -102,26 +102,48 @@ class DataLoader():
                 if unique:
                     # subtraction is bijective here
                     state_file = (black_board_file - white_board_file).reshape((-1, 64)) * (1 - side_file[:, None]*2)
-                    state_file_unq, unq_idxs = np.unique(state_file, axis=0, return_index=True)
+                    state_file_unq, unq_idxs, inv_idxs, counts = np.unique(state_file, return_index=True, return_inverse=True, return_counts=True, axis=0)
                     print(f"unique {len(black_board_file)} -> {len(unq_idxs)}")
 
-                    black_board_file = black_board_file[unq_idxs]
-                    white_board_file = white_board_file[unq_idxs]
-                    side_file = side_file[unq_idxs]
-                    legal_flags_file = legal_flags_file[unq_idxs]
+                    black_board_file = np.concatenate([
+                        black_board_file[unq_idxs[counts == 1]],
+                        black_board_file[unq_idxs[counts > 1]],
+                    ], axis=0)
+                    white_board_file = np.concatenate([
+                        white_board_file[unq_idxs[counts == 1]],
+                        white_board_file[unq_idxs[counts > 1]],
+                    ], axis=0)
+                    side_file = np.concatenate([
+                        side_file[unq_idxs[counts == 1]],
+                        side_file[unq_idxs[counts > 1]],
+                    ], axis=0)
+                    legal_flags_file = np.concatenate([
+                        legal_flags_file[unq_idxs[counts == 1]],
+                        legal_flags_file[unq_idxs[counts > 1]],
+                    ], axis=0)
 
                     # take average
                     result_file_avg = []
                     Q_file_avg = []
                     posteriors_file_avg = []
-                    for s in state_file_unq:
-                        idxs = (state_file == s).all(axis=1).nonzero()[0]
+                    for unq_idx in unq_idxs[counts > 1]:
+                        idxs = (inv_idxs == inv_idxs[unq_idx]).nonzero()[0]
                         result_file_avg.append(result_file[idxs].mean(axis=0))
                         Q_file_avg.append(Q_file[idxs].mean(axis=0))
                         posteriors_file_avg.append(posteriors_file[idxs].mean(axis=0))
-                    result_file = np.array(result_file_avg)
-                    Q_file = np.array(Q_file_avg)
-                    posteriors_file = np.array(posteriors_file_avg)
+
+                    result_file = np.concatenate([
+                        result_file[unq_idxs[counts == 1]],
+                        np.array(result_file_avg)
+                    ], axis=0)
+                    Q_file = np.concatenate([
+                        Q_file[unq_idxs[counts == 1]],
+                        np.array(Q_file_avg)
+                    ], axis=0)
+                    posteriors_file = np.concatenate([
+                        posteriors_file[unq_idxs[counts == 1]],
+                        np.array(posteriors_file_avg)
+                    ], axis=0)
 
                 black_board_file = torch.tensor(black_board_file, dtype=torch.float)
                 white_board_file = torch.tensor(white_board_file, dtype=torch.float)

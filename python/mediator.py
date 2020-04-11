@@ -10,11 +10,9 @@
 
 import argparse
 import subprocess
-import time
 import re
 import glob
 import os
-import datetime
 import numpy as np
 
 
@@ -164,13 +162,16 @@ if __name__ == '__main__':
     parser.add_argument("cmd2", type=str, help="command for the second program")
     parser.add_argument("-n", "--n-games", type=int, default=1, help="number of games to play")
     parser.add_argument("-q", "--quiet", action="store_true")
+    parser.add_argument("--side1", type=str)
     args = parser.parse_args()
 
-    print("side ([b]lack / [w]hite) of the first program ? ", end="")
-    side1 = input()
+    if not args.side1:  # side1 not specified in options
+        print("side ([b]lack / [w]hite) of the first program ? ", end="")
+        side1 = input()
+    else:
+        side1 = args.side1
 
-    time_stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_fname = f"log_{time_stamp}.txt"
+    log_fname = f"log.txt"
     with open(log_fname, "w") as file:
         results = []
         for i in range(args.n_games):

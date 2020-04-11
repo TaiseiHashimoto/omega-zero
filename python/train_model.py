@@ -14,7 +14,7 @@ def get_window_size(generation, window_size_max, ratio=0.6):
     return min(int(np.ceil((generation+1) * ratio)), window_size_max)
 
 
-def get_file_paths(exp_path, generation, window_size_max, delete_old=True):
+def get_file_paths(exp_path, generation, window_size_max):
     window_size = get_window_size(generation, window_size_max)
     print(f"window_size = {window_size}")
 
@@ -23,16 +23,15 @@ def get_file_paths(exp_path, generation, window_size_max, delete_old=True):
         path = exp_path / pathlib.Path(f"mldata/{i}.dat")
         file_paths.append(path)
 
-    if delete_old:
-        for i in range(generation - window_size + 1):
-            path = exp_path / "mldata" / f"{i}.dat"
-            if path.exists():
-                print(f"unlink {path}")
-                path.unlink()
-            bu_path = exp_path / "mldata" / f"{i}.pt"
-            if bu_path.exists():
-                print(f"unlink {bu_path}")
-                bu_path.unlink()
+    for i in range(generation - window_size + 1):
+        path = exp_path / "mldata" / f"{i}.dat"
+        if path.exists():
+            print(f"unlink {path.name}")
+            path.unlink()
+        bu_path = exp_path / "mldata" / f"{i}.pt"
+        if bu_path.exists():
+            print(f"unlink {bu_path.name}")
+            bu_path.unlink()
 
     return file_paths
 
@@ -45,8 +44,7 @@ def train(args):
     root_path = pathlib.Path(__file__).resolve().parents[1]
     exp_path = root_path / "exp" / str(args.exp_id)
     config_path = exp_path / "config.json"
-    old_model_path = exp_path / "model" / f"model_{args.generation}.pt"
-    old_model_jit_path = exp_path / "model" / f"model_jit_{args.generation}.pt"
+    best_model_path = exp_path / "model" / f"model_best.pt"
     new_model_path = exp_path / "model" / f"model_{args.generation+1}.pt"
     new_model_jit_path = exp_path / "model" / f"model_jit_{args.generation+1}.pt"
     # optim_path = exp_path / "model" / "optim.pt"
@@ -69,8 +67,8 @@ def train(args):
     )
 
     # load latest model
-    omega_net.load_state_dict(torch.load(old_model_path))
-    print(f"load {old_model_path.name}")
+    omega_net.load_state_dict(torch.load(best_model_path))
+    print(f"load {best_model_path.name}")
 
     omega_net.to(device)
     optim = torch.optim.AdamW(omega_net.parameters(), weight_decay=config["weight_decay"])
@@ -93,21 +91,19 @@ def train(args):
         value_loss_avg = 0
         entropy_avg = 0
         # loss_uni_avg = 0
-        for black_board_b, white_board_b, side_b, legal_flags_b, result_b, Q_b, posteriors_b in loader:
+        for black_board_b, white_board_b, side_b, legal_flags_b, result_b, posteriors_b in loader:
             black_board_b = black_board_b.to(device)
             white_board_b = white_board_b.to(device)
             side_b = side_b.to(device)
             legal_flags_b = legal_flags_b.to(device)
             result_b = result_b.to(device)
-            Q_b = Q_b.to(device)
             posteriors_b = posteriors_b.to(device)
 
             policy_logit_b, value_pred_b = omega_net(black_board_b, white_board_b, side_b, legal_flags_b)
 
             policy_loss = -(posteriors_b * policy_logit_b).sum(dim=1).mean(dim=0)
 
-            value_target_b = result_b * (1 - args.Q_frac) + Q_b * args.Q_frac
-            value_loss = (value_pred_b - value_target_b).pow(2).mean(dim=0)
+            value_loss = (value_pred_b - result_b).pow(2).mean(dim=0)
 
             loss = policy_loss + value_loss
             optim.zero_grad()
@@ -136,11 +132,6 @@ def train(args):
     omega_net_traced.save(str(new_model_jit_path))
 
     print(f"save model {new_model_path.name}, {new_model_jit_path.name}")
-
-    if args.generation % 5 != 0:  # delete old model
-        print(f"unlink {old_model_path.name}, {old_model_jit_path.name}")
-        old_model_path.unlink()
-        old_model_jit_path.unlink()
 
 
 if __name__ == '__main__':

@@ -10,7 +10,7 @@ model/*
 *.pt
 sftp-config.json
 __pycache__/
-record*.txt
+*record*.txt
 log*.txt
 *.lprof
 exp/

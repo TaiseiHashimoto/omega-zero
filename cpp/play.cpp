@@ -16,32 +16,35 @@
 
 
 int main(int argc, char *argv[]) {
-    if ((argc < 3) || (argc > 3 && argv[3][0] != '-')) {
-        fprintf(stderr, "Usage: play exp_id generation [--n_simulation=N] [--device_id=ID] [--record_fname=NAME]\n");
+    if ((argc < 2) || (argc > 2 && argv[2][0] != '-')) {
+        fprintf(stderr, "Usage: play exp_id [--generation=G] [--n_simulation=N] [--device_id=ID] [--record_fname=NAME]\n");
         exit(-1);
     }
     int exp_id = atoi(argv[1]);
-    int generation = atoi(argv[2]);
     std::cout << "exp_id = " << exp_id << std::endl;
-    std::cout << "generation = " << generation << std::endl;
 
     char exp_path[100];
     get_exp_path(argv[0], exp_id, exp_path);
     std::cout << "exp_path = " << exp_path << std::endl;
 
+    int generation = -1;  // if -1 select best model
     int n_simulation = 400;
     char record_fname[100] = "./record.txt";
     int device_id = 0;
 
     int opt, longindex;
     const struct option longopts[] = {
+        {"generation", required_argument, NULL, 'g'},
         {"n_simulation", required_argument, NULL, 'n'},
         {"device_id", required_argument, NULL, 'd'},
         {"record_fname", required_argument, NULL, 'r'},
         {0, 0, 0, 0}
     };
-    while ((opt = getopt_long(argc, argv, "n:d:r:", longopts, &longindex)) != -1) {
+    while ((opt = getopt_long(argc, argv, "g:n:d:r:", longopts, &longindex)) != -1) {
         switch (opt) {
+            case 'g':
+                generation = atoi(optarg);
+                break;
             case 'n':
                 n_simulation = atoi(optarg);
                 break;
@@ -56,6 +59,7 @@ int main(int argc, char *argv[]) {
                 exit(-1);
         }
     }
+    std::cout << "generation = " << generation << std::endl;
     std::cout << "n_simulation = " << n_simulation << std::endl;
     std::cout << "device_id = " << device_id << std::endl;
     std::cout << "record_fname = " << record_fname << std::endl;

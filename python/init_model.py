@@ -3,6 +3,7 @@ from model import OmegaNet
 import pathlib
 import argparse
 import json
+import shutil
 
 
 if __name__ == '__main__':
@@ -16,6 +17,8 @@ if __name__ == '__main__':
     model_path = exp_path / "model"
     new_model_path = model_path / 'model_0.pt'
     new_model_jit_path = model_path / 'model_jit_0.pt'
+    best_model_path = model_path / 'model_best.pt'
+    best_model_jit_path = model_path / 'model_jit_best.pt'
     # print(f"config_path={config_path}")
     # print(f"new_model_path={new_model_path}")
     # print(f"new_model_jit_path={new_model_jit_path}")
@@ -42,3 +45,6 @@ if __name__ == '__main__':
 
     omega_net_jit = torch.jit.trace(omega_net, (black_board_dummy, white_board_dummy, side_dummy, legal_flags_dummy))
     omega_net_jit.save(str(new_model_jit_path))
+
+    shutil.copy(new_model_path, best_model_path)
+    shutil.copy(new_model_jit_path, best_model_jit_path)

@@ -41,7 +41,6 @@ class DataLoader():
         side_all = []
         legal_flags_all = []
         result_all = []
-        Q_all = []
         posteriors_all = []
 
         for file_path in file_paths:
@@ -55,7 +54,6 @@ class DataLoader():
                 side_file = data["side"]
                 legal_flags_file = data["legal_flags"]
                 result_file = data["result"]
-                Q_file = data["Q"]
                 posteriors_file = data["posteriors"]
             else:
                 print(f"load {file_path.name} from data file", end="  ")
@@ -64,7 +62,6 @@ class DataLoader():
                 side_file = []
                 legal_flags_file = []
                 result_file = []
-                Q_file = []
                 posteriors_file = []
                 with open(file_path, "rb") as file:
                     entry = Entry()
@@ -74,7 +71,6 @@ class DataLoader():
                         side_file.append(entry.side)
                         legal_flags_file.append(np.ctypeslib.as_array(entry.legal_flags).copy())
                         result_file.append(entry.result)
-                        Q_file.append(entry.Q)
                         posteriors_file.append(np.ctypeslib.as_array(entry.posteriors).copy())
 
                 black_bitboard_file = np.array(black_bitboard_file, dtype=np.uint64)
@@ -82,7 +78,6 @@ class DataLoader():
                 side_file = np.array(side_file, dtype=np.float32)
                 legal_flags_file = np.array(legal_flags_file, dtype=np.float32)
                 result_file = np.array(result_file, dtype=np.float32)
-                Q_file = np.array(Q_file, dtype=np.float32)
                 posteriors_file = np.array(posteriors_file, dtype=np.float32)
 
                 black_board_flat_file = (black_bitboard_file[:, None] & self.pos_binary > 0).astype(np.float32)
@@ -96,7 +91,6 @@ class DataLoader():
                     side_file = side_file.repeat(8, axis=0)
                     legal_flags_file = make_variations(legal_flags_file.reshape((-1, 8, 8))).reshape((-1, 64))
                     result_file = result_file.repeat(8, axis=0)
-                    Q_file = Q_file.repeat(8, axis=0)
                     posteriors_file = make_variations(posteriors_file.reshape((-1, 8, 8))).reshape((-1, 64))
 
                 if unique:
@@ -124,21 +118,15 @@ class DataLoader():
 
                     # take average
                     result_file_avg = []
-                    Q_file_avg = []
                     posteriors_file_avg = []
                     for unq_idx in unq_idxs[counts > 1]:
                         idxs = (inv_idxs == inv_idxs[unq_idx]).nonzero()[0]
                         result_file_avg.append(result_file[idxs].mean(axis=0))
-                        Q_file_avg.append(Q_file[idxs].mean(axis=0))
                         posteriors_file_avg.append(posteriors_file[idxs].mean(axis=0))
 
                     result_file = np.concatenate([
                         result_file[unq_idxs[counts == 1]],
                         np.array(result_file_avg)
-                    ], axis=0)
-                    Q_file = np.concatenate([
-                        Q_file[unq_idxs[counts == 1]],
-                        np.array(Q_file_avg)
                     ], axis=0)
                     posteriors_file = np.concatenate([
                         posteriors_file[unq_idxs[counts == 1]],
@@ -150,7 +138,6 @@ class DataLoader():
                 side_file = torch.tensor(side_file, dtype=torch.float)
                 legal_flags_file = torch.tensor(legal_flags_file, dtype=torch.float)
                 result_file = torch.tensor(result_file, dtype=torch.float)
-                Q_file = torch.tensor(Q_file, dtype=torch.float)
                 posteriors_file = torch.tensor(posteriors_file, dtype=torch.float)
 
                 torch.save({
@@ -159,7 +146,6 @@ class DataLoader():
                     "side": side_file,
                     "legal_flags": legal_flags_file,
                     "result": result_file,
-                    "Q": Q_file,
                     "posteriors": posteriors_file,
                 }, bu_path)
 
@@ -170,7 +156,6 @@ class DataLoader():
             side_all.append(side_file)
             legal_flags_all.append(legal_flags_file)
             result_all.append(result_file)
-            Q_all.append(Q_file)
             posteriors_all.append(posteriors_file)
 
         self.black_board_all = torch.cat(black_board_all, dim=0)
@@ -178,7 +163,6 @@ class DataLoader():
         self.side_all = torch.cat(side_all, dim=0)
         self.legal_flags_all = torch.cat(legal_flags_all, dim=0)
         self.result_all = torch.cat(result_all, dim=0)
-        self.Q_all = torch.cat(Q_all, dim=0)
         self.posteriors_all = torch.cat(posteriors_all, dim=0)
 
         self.total_entry = len(self.black_board_all)
@@ -208,7 +192,6 @@ class DataLoader():
         side_b = self.side_all[idxs]
         legal_flags_b = self.legal_flags_all[idxs]
         result_b = self.result_all[idxs]
-        Q_b = self.Q_all[idxs]
         posteriors_b = self.posteriors_all[idxs]
 
-        return black_board_b, white_board_b, side_b, legal_flags_b, result_b, Q_b, posteriors_b
+        return black_board_b, white_board_b, side_b, legal_flags_b, result_b, posteriors_b

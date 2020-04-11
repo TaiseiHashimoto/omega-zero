@@ -58,7 +58,12 @@ void init_config(const char *exp_path, int generation, int device_id) {
     // printf("n_game=%d n_thread=%d n_simulation=%d\n", config.n_game, config.n_thread, config.n_simulation);
 
     config.device_id = device_id;
-    sprintf(config.model_fname, "%s/model/model_jit_%d.pt", exp_path, generation);
+
+    if (generation >= 0) {
+        sprintf(config.model_fname, "%s/model/model_jit_%d.pt", exp_path, generation);
+    } else {
+        sprintf(config.model_fname, "%s/model/model_jit_best.pt", exp_path);
+    }
     // printf("model_fname=%s\n", config.model_fname);
 }
 

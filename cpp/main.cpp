@@ -88,9 +88,9 @@ int main(int argc, char *argv[]) {
     }
     std::cout << "device_id = " << device_id << std::endl;
 
-    init_config(exp_path, generation, device_id);
-
+    init_config(exp_path, /*generation=*/-1, device_id);  // use best model
     const auto& config = get_config();
+
     int n_game_each = (config.n_game + config.n_thread - 1) / config.n_thread;
 
     pid_t server_pid = create_server_process();

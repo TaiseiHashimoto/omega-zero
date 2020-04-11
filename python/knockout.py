@@ -12,7 +12,7 @@ if __name__ == '__main__':
     parser.add_argument("generation", type=int)
     parser.add_argument("--n-games", type=int, default=3)
     parser.add_argument("--n-simulation", type=int, default=50)
-    parser.add_argument("--threshold", type=float, default=0.5)
+    parser.add_argument("--threshold", type=int, default=50)
     parser.add_argument("--device-id", type=int, default=0)
     args = parser.parse_args()
 
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     cmd1 = f"{build_path}/play {args.exp_id} --generation {args.generation} --n_simulation {args.n_simulation} --device_id {args.device_id}"
     cmd2 = f"{build_path}/play {args.exp_id} --n_simulation {args.n_simulation} --device_id {args.device_id}"
 
-    win_rates = {}
+    update = False
     start = time.time()
 
     for side1 in ['b', 'w']:
@@ -46,16 +46,19 @@ if __name__ == '__main__':
         assert mr
 
         win_rate = float(mr.group(1))
-        win_rates[side1] = win_rate
         file.write(f"{side1} {win_rate:.4f}\n")
         file.flush()
+
+        if win_rate < args.threshold:
+            break
+        if side1 == 'w':
+            update = True
 
     elapsed = time.time() - start
     print(f"elapsed : {elapsed:.2f}")
 
-    file.close()
-
-    if win_rates['b'] > args.threshold and win_rates['w'] > args.threshold:
+    if update:
+        file.write("update best model\n")
         print("update best model")
         shutil.copy(model_path, best_model_path)
         shutil.copy(model_jit_path, best_model_jit_path)
@@ -64,3 +67,5 @@ if __name__ == '__main__':
         print(f"unlink {model_path.name}, {model_jit_path.name}")
         model_path.unlink()
         model_jit_path.unlink()
+
+    file.close()

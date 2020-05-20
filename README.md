@@ -28,5 +28,5 @@ In build directory
     - python (pytorch)
     - providing player's board and opponent's board as input  
       (instead of providing black board, white board and color board)
-    - data augmentation (x8, flip & rotation)
+    - data augmentation (8x, flip & rotation)
     - remove duplication

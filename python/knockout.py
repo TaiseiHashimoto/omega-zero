@@ -25,7 +25,7 @@ if __name__ == '__main__':
     best_model_path = exp_path / "model" / f"model_best.pt"
     best_model_jit_path = exp_path / "model" / f"model_jit_best.pt"
 
-    file = open(f"ko_record_{args.exp_id}.txt", 'a')
+    file = open(exp_path / f"ko_record_{args.exp_id}.txt", 'a')
     file.write(f"{args.generation}\n")
 
     cmd1 = f"{build_path}/play {args.exp_id} --generation {args.generation} --n_simulation {args.n_simulation} --device_id {args.device_id}"
@@ -55,7 +55,7 @@ if __name__ == '__main__':
             update = True
 
     elapsed = time.time() - start
-    print(f"elapsed : {elapsed:.2f}")
+    print(f"elapsed : {elapsed:.2f} sec")
 
     if update:
         file.write("update best model\n")
